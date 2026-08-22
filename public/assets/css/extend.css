@@ -1,0 +1,38 @@
+.border-primary{
+	border-top: 3px solid var(--color-default) !important;
+}
+
+.btn-outline-primary{
+	border: 1px solid var(--color-default)!important;
+	color: var(--color-default)!important;
+}
+.active{
+	background: var(--color-default)!important;
+	color: #fff !important;
+	border: none;
+}
+.link-active{
+	background: var(--color-default)!important;
+	color: #fff !important;
+}
+.btn-outline-primary:hover{
+	background: var(--color-default)!important;
+	color: #fff !important;
+}
+.btn-primary{
+	background: var(--color-default)!important;
+	border: none;
+}
+.btn-success{
+	background: var(--color-default)!important;
+	border: none;
+}
+.switcher-btn{
+	background: var(--color-default)!important;
+}
+.bg-primary{
+	background: var(--color-default)!important;
+}
+.text-primary{
+	color: var(--color-default)!important;
+}

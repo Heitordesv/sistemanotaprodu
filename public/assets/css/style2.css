@@ -1,0 +1,64 @@
+.loading-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.6;
+    background-color: #435ebe;
+    z-index: 999;
+}
+
+.loading-page .loading-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    flex-direction: column;
+    text-align: center;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.loader > div {
+    animation: is-rotating 1s infinite;
+    animation-duration: 1.2s;
+    animation-delay: 0;
+    border: 4px solid #e5e5e5;
+    border-radius: 50%;
+    border-top-color: blue;
+    height: 35px;
+    width: 35px;
+}
+
+@keyframes is-rotating {
+    to {
+        transform: rotate(2turn);
+    }
+}
+
+/**
+ * LOADING SWEETALERT2
+ */
+.swal2-loading {
+    padding-bottom: 20px !important;
+}
+
+*:focus, *:active {
+    outline: 0 !important; 
+}
+
+.sweet-alert button.confirm {
+    outline: none !important; 
+}
+
+
+.table-responsive {
+    min-height: 500px;
+}
+
+.table-responsive .table {
+    width: 99%;
+}

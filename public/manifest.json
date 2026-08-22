@@ -1,0 +1,50 @@
+{
+  "name": "NF-e Notas",
+  "short_name": "NF-e Notas",
+  "description": "Aplicativo para emissão de notas fiscais eletrônicas e gestão empresarial.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0d6efd",
+  "scope": "/",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "logos/logonfenotas.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "logos/logonfenotas.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "logos/logonfenotas.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "logos/logonfenotas.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logos/logonfenotas.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "logos/logonfenotas.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "logos/logonfenotas.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "prefer_related_applications": false
+}

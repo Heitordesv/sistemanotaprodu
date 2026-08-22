@@ -1,0 +1,62 @@
+version: "3.7"
+
+services:
+  # Serviço da aplicação (PHP + Laravel)
+  php:
+    container_name: deliverybasb
+    build: 
+      context: ./
+      dockerfile: Dockerfile
+      args: 
+        user: ${USER}
+        uid: ${UID:-1000}
+    image: deliverybasb
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - mysql
+    networks: 
+      - deliverybasb
+
+  # Serviço do NGINX
+  nginx:
+    container_name: nginx_deliverybasb
+    image: nginx:alpine
+    restart: unless-stopped
+    ports: 
+      - "8080:8000" # Acessível via http://localhost:8080
+    volumes: 
+      - ./:/var/www
+      - ./docker/nginx/:/etc/nginx/conf.d/
+    depends_on:
+      - php
+    networks: 
+      - deliverybasb
+
+  # Serviço do banco de dados
+  mysql:
+    container_name: mysql_deliverybasb
+    image: mariadb:10.2
+    restart: unless-stopped
+    environment: 
+      MYSQL_ROOT_PASSWORD: deliverybasb
+      MYSQL_DATABASE: deliverybasb
+      MYSQL_USER: deliverybasb
+      MYSQL_PASSWORD: deliverybasb
+    volumes: 
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks: 
+      - deliverybasb
+
+# Rede compartilhada entre os containers
+networks: 
+  deliverybasb:
+    driver: bridge
+
+# Volume nomeado
+volumes:
+  mysql_data:

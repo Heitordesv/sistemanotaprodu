@@ -1,0 +1,37 @@
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNFe Id="NFe21250623439441003539550020092742521100223238" versao="4.00"><ide><cUF>21</cUF><cNF>10022323</cNF><natOp>VENDA DE MERCADORIA, ADQUIRIDA OU RECEBIDA DE TERCEIROS, SUJ</natOp><mod>55</mod><serie>2</serie><nNF>9274252</nNF><dhEmi>2025-06-28T03:23:52-03:00</dhEmi><dhSaiEnt>2025-06-28T03:23:52-03:00</dhSaiEnt><tpNF>1</tpNF><idDest>1</idDest><cMunFG>2111300</cMunFG><tpImp>1</tpImp><tpEmis>1</tpEmis><cDV>8</cDV><tpAmb>1</tpAmb><finNFe>1</finNFe><indFinal>0</indFinal><indPres>0</indPres><procEmi>0</procEmi><verProc>GMCore</verProc></ide><emit><CNPJ>23439441003539</CNPJ><xNome>ARMAZEM MATEUS SA - ITAPERA KM12</xNome><enderEmit><xLgr>AV ENGENHEIRO EMILIANO MACIEIRA</xLgr><nro>20</nro><xBairro>MARACANA</xBairro><cMun>2111300</cMun><xMun>SAO LUIS</xMun><UF>MA</UF><CEP>65095603</CEP><cPais>1058</cPais><xPais>Brasil</xPais><fone>0021083547</fone></enderEmit><IE>125214715</IE><CRT>3</CRT></emit><dest><CNPJ>20649860000168</CNPJ><xNome>METERIAL DE CONSTRUCAO</xNome><enderDest><xLgr>RUA SAO SEBASTIAO CASA</xLgr><nro>s/n</nro><xBairro>CENTRO</xBairro><cMun>2110609</cMun><xMun>SAO BERNARDO</xMun><UF>MA</UF><CEP>65550000</CEP><cPais>1058</cPais><xPais>BRASIL</xPais><fone>9881633487</fone></enderDest><indIEDest>1</indIEDest><IE>124422110</IE></dest><det nItem="1"><prod><cProd>431314</cProd><cEAN>SEM GTIN</cEAN><xProd>PNEU CAR XBRI 175/70R13 82T PREMIUM F7</xProd><NCM>40111000</NCM><CEST>1600100</CEST><CFOP>5403</CFOP><uCom>UN</uCom><qCom>2</qCom><vUnCom>275.99</vUnCom><vProd>551.98</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>2</qTrib><vUnTrib>275.99</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS10><orig>1</orig><CST>10</CST><modBC>2</modBC><vBC>551.98</vBC><pICMS>23</pICMS><vICMS>126.96</vICMS><modBCST>0</modBCST><vBCST>860.24</vBCST><pICMSST>23</pICMSST><vICMSST>70.90</vICMSST></ICMS10></ICMS><IPI><cEnq>999</cEnq><IPITrib><CST>50</CST><vBC>551.98</vBC><pIPI>9.75</pIPI><vIPI>53.82</vIPI></IPITrib></IPI><PIS><PISNT><CST>04</CST></PISNT></PIS><COFINS><COFINSNT><CST>04</CST></COFINSNT></COFINS></imposto></det><total><ICMSTot><vBC>551.98</vBC><vICMS>126.96</vICMS><vICMSDeson>0</vICMSDeson><vFCPUFDest>0</vFCPUFDest><vICMSUFDest>0</vICMSUFDest><vICMSUFRemet>0</vICMSUFRemet><vFCP>0</vFCP><vBCST>860.24</vBCST><vST>70.90</vST><vFCPST>0</vFCPST><vFCPSTRet>0</vFCPSTRet><vProd>551.98</vProd><vFrete>0</vFrete><vSeg>0</vSeg><vDesc>0</vDesc><vII>0</vII><vIPI>53.82</vIPI><vIPIDevol>0</vIPIDevol><vPIS>0</vPIS><vCOFINS>0</vCOFINS><vOutro>0</vOutro><vNF>676.70</vNF></ICMSTot></total><transp><modFrete>0</modFrete><vol><qVol>2</qVol><esp>VOLUMES</esp><marca>DIVERSOS</marca><pesoL>13.650</pesoL><pesoB>13.650</pesoB></vol></transp><cobr><fat><nFat>9274252</nFat><vOrig>676.70</vOrig><vDesc>0</vDesc><vLiq>676.70</vLiq></fat><dup><nDup>001</nDup><dVenc>2025-07-28</dVenc><vDup>169.17</vDup></dup><dup><nDup>002</nDup><dVenc>2025-08-27</dVenc><vDup>169.17</vDup></dup><dup><nDup>003</nDup><dVenc>2025-09-26</dVenc><vDup>169.17</vDup></dup><dup><nDup>004</nDup><dVenc>2025-10-27</dVenc><vDup>169.19</vDup></dup></cobr><pag><detPag><tPag>14</tPag><vPag>676.70</vPag></detPag></pag><infAdic><infCpl>Pedido: 1002232312 Cliente: 1180360 Pedido 4716018 CONHECIMENTO: 7178884. PLACA: LVX-8A40 MOTORISTA: MAXSUEL FRAZAO RIBEIRO.#Existem 1 volumes VENDEDOR: EMERSON MENESES REPRESENTANTE COMERCIAL LTDA.</infCpl></infAdic></infNFe><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1" /><Reference URI="#NFe21250623439441003539550020092742521100223238"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" /><DigestValue>N/etpvYzT3yGGVs+a/OHVDzEPGk=</DigestValue></Reference></SignedInfo><SignatureValue>hr/rLf14wPvWSEMskxuI2CrWm+vqZKMVkTuOs0HOEkjEJhbb+mTCTzrH1TxFE88Vk5wQiPL0DMDS
+e4gV0oMn0fRP+b0DiJhR8EW0VfnyfW2QQiIRcyaBMj+3E2muK39HpBCt/XLc8pjMdzDxPxEqE8Bn
+kKlI2Anvk0UGaUdL23C2HkEP0a4EKW5NPX0u+kduy8aUyEYux6qGJUk4FEwLoqhe5SARirdtbnD9
+61Bi8Nmos9WvHTe30S7VTJws/TLQoiWAw+XL5tacOgDsQTlJpmfs2Rco1EOUxFs8GaUaZtUIYE4V
+pxfNcvB61AnBOcRIWS9BzSGCNn87j+lv7eeCJg==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIHQTCCBSmgAwIBAgIIWQwkEhM1VjgwDQYJKoZIhvcNAQELBQAwWTELMAkGA1UEBhMCQlIxEzAR
+BgNVBAoTCklDUC1CcmFzaWwxFTATBgNVBAsTDEFDIFNPTFVUSSB2NTEeMBwGA1UEAxMVQUMgU09M
+VVRJIE11bHRpcGxhIHY1MB4XDTI0MTIxMzExNTUwMFoXDTI1MTIxMzExNTUwMFowgeAxCzAJBgNV
+BAYTAkJSMRMwEQYDVQQKEwpJQ1AtQnJhc2lsMQswCQYDVQQIEwJNQTERMA8GA1UEBxMIU2FvIEx1
+aXMxHjAcBgNVBAsTFUFDIFNPTFVUSSBNdWx0aXBsYSB2NTEXMBUGA1UECxMOMzU2MjI0MDYwMDAx
+OTAxHDAaBgNVBAsTE0NlcnRpZmljYWRvIERpZ2l0YWwxGjAYBgNVBAsTEUNlcnRpZmljYWRvIFBK
+IEExMSkwJwYDVQQDEyBBUk1BWkVNIE1BVEVVUyBTQToyMzQzOTQ0MTAwMTMyMzCCASIwDQYJKoZI
+hvcNAQEBBQADggEPADCCAQoCggEBAJvKK/Xfigsv2qt6JGXWc2hnhSg+g8LZtOcOLfQtEYgqu55U
+4RdUBck6uMEKdoPLxq1bDQ+9VDiZ08M+ihVwAKZ3rCy718ujd9RsXvFCr+PX28ErDo2ZKKDD6NsX
+/EZbKIUEmL3l8pL3U2Zn6wweGE4Hz05qG+AEA5F5nR5Vl6NHutMFt6URGkuWRVixl9U3CVUk4sxU
+6BnqzIMCtjabWTQWloZIQO6ukNjE6HO2qGIm7/voSHAXLcW4RH7fXGBs23MvlpwhthPW2Qwf1rbG
+fVMN4SCV+rUu6RsnkCP055LvQufJ3LZiTV2EWq+e9+ftoRi/BhgSgkhr8P07fdOgMT8CAwEAAaOC
+AoMwggJ/MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAUxVLtJYAJ35yCyJ9Hxt20XzHdubEwVAYIKwYB
+BQUHAQEESDBGMEQGCCsGAQUFBzAChjhodHRwOi8vY2NkLmFjc29sdXRpLmNvbS5ici9sY3IvYWMt
+c29sdXRpLW11bHRpcGxhLXY1LnA3YjCBvgYDVR0RBIG2MIGzgSBjb3JyZWEuY2FybG9zQGdydXBv
+bWF0ZXVzLmNvbS5icqAhBgVgTAEDAqAYExZJTFNPTiBNQVRFVVMgUk9EUklHVUVToBkGBWBMAQMD
+oBATDjIzNDM5NDQxMDAxMzIzoDgGBWBMAQMEoC8TLTA2MDMxOTYzMjI1ODQwMTMzMDQwMDAwMDAw
+MDAwMDAwMDAwMDAwMDAwMDAwMKAXBgVgTAEDB6AOEwwwMDAwMDAwMDAwMDAwXQYDVR0gBFYwVDBS
+BgZgTAECASYwSDBGBggrBgEFBQcCARY6aHR0cDovL2NjZC5hY3NvbHV0aS5jb20uYnIvZG9jcy9k
+cGMtYWMtc29sdXRpLW11bHRpcGxhLnBkZjAdBgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwQw
+gYwGA1UdHwSBhDCBgTA+oDygOoY4aHR0cDovL2NjZC5hY3NvbHV0aS5jb20uYnIvbGNyL2FjLXNv
+bHV0aS1tdWx0aXBsYS12NS5jcmwwP6A9oDuGOWh0dHA6Ly9jY2QyLmFjc29sdXRpLmNvbS5ici9s
+Y3IvYWMtc29sdXRpLW11bHRpcGxhLXY1LmNybDAdBgNVHQ4EFgQUvx6bR+NUw7Lki6z+paXFsNB6
+etQwDgYDVR0PAQH/BAQDAgXgMA0GCSqGSIb3DQEBCwUAA4ICAQCXxqPN44QqqZDnNszlhXUeIbKZ
+EiexSD0hPQpOG8cRT6EwUySNxSH+6CZnxn7iD+mY7zG63X6RyFqvjY/xDddsgKkhXyRvvNZMBVK/
+EVBj7dzcAMINIiU+i3xE97ElpPL1eyrxG2JsHDluV6/k6V90Lxb5EjIbuqv76ee6Q2KW1F2x9Qb3
+VHGkPdYRL627kNe6jT8GE7B8TgoicoI34LMu/L+aYekcVE+5p3EHuDc4sKxZR0vZBXzyXmnIU/FZ
+1JyI/nQlKpPBp8U5d++kyZFiHtsLOgVqazPi/Rh7vDxZuMbd6DalpSGQWXiPbjYScFpzp9JlbMEu
+SHgFNDXUJMkAXPXr2b1Rf6Nub1XKsw3+I1WDx76H4v+MyxzaHqDXUsUaoxE+qk9G448kjVaR1Sdp
+MMsPnAqjr9oU13NFQ/h0L7OjMn72oNkttI83egDXbeqhu9jq0slmGW9tSoBKEEHSguAG/yZ7ENs1
+SdgucEdes/fFD/4EhvG88ECpsYPboqAAXrR8lnmVGOTKEA290ygfb02hJYgSZLxDcb55vFNRfqGU
++pzt1zJiQpE5j1I8B/VhZ+vAF8kjv2VY0CJ3UaKFUdT4D8BebcbUYIm6mCgca5ISrXe57lIZwrGn
+cOzdaJtTTM8ixifLFthva9wVvtpEgfhotSU8vwOiaBi9fMriOw==</X509Certificate></X509Data></KeyInfo></Signature></NFe><protNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><infProt Id="ID421250022849601"><tpAmb>1</tpAmb><verAplic>SVAN_2.2.7</verAplic><chNFe>21250623439441003539550020092742521100223238</chNFe><dhRecbto>2025-06-28T03:23:54-03:00</dhRecbto><nProt>421250022849601</nProt><digVal>N/etpvYzT3yGGVs+a/OHVDzEPGk=</digVal><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></nfeProc>

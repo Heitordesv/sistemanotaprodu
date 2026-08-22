@@ -1,0 +1,37 @@
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNFe Id="NFe21250923439441003539550020098195861101004192" versao="4.00"><ide><cUF>21</cUF><cNF>10100419</cNF><natOp>VENDA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS</natOp><mod>55</mod><serie>2</serie><nNF>9819586</nNF><dhEmi>2025-09-15T21:22:13-03:00</dhEmi><dhSaiEnt>2025-09-15T21:22:13-03:00</dhSaiEnt><tpNF>1</tpNF><idDest>1</idDest><cMunFG>2111300</cMunFG><tpImp>1</tpImp><tpEmis>1</tpEmis><cDV>2</cDV><tpAmb>1</tpAmb><finNFe>1</finNFe><indFinal>0</indFinal><indPres>0</indPres><procEmi>0</procEmi><verProc>GMCore</verProc></ide><emit><CNPJ>23439441003539</CNPJ><xNome>ARMAZEM MATEUS SA - ITAPERA KM12</xNome><enderEmit><xLgr>AV ENGENHEIRO EMILIANO MACIEIRA</xLgr><nro>20</nro><xBairro>MARACANA</xBairro><cMun>2111300</cMun><xMun>SAO LUIS</xMun><UF>MA</UF><CEP>65095603</CEP><cPais>1058</cPais><xPais>Brasil</xPais><fone>0021083547</fone></enderEmit><IE>125214715</IE><CRT>3</CRT></emit><dest><CNPJ>19236495000180</CNPJ><xNome>C J P AIRES CONSTRUCAO ME</xNome><enderDest><xLgr>R EDMUNDO PEREIRA 8 SL</xLgr><nro>2</nro><xBairro>CENTRO</xBairro><cMun>2110609</cMun><xMun>SAO BERNARDO</xMun><UF>MA</UF><CEP>65550000</CEP><cPais>1058</cPais><xPais>BRASIL</xPais><fone>98985479734</fone></enderDest><indIEDest>1</indIEDest><IE>124242090</IE></dest><det nItem="1"><prod><cProd>54025</cProd><cEAN>7891738018855</cEAN><xProd>PREGO GERDAU 1.1/4X13 15X15 1KG</xProd><NCM>73170090</NCM><CFOP>5102</CFOP><uCom>PT</uCom><qCom>22</qCom><vUnCom>12.56</vUnCom><vProd>276.32</vProd><cEANTrib>7891738018855</cEANTrib><uTrib>PT</uTrib><qTrib>22</qTrib><vUnTrib>12.56</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS20><orig>0</orig><CST>20</CST><modBC>2</modBC><pRedBC>47.8261</pRedBC><vBC>144.17</vBC><pICMS>23</pICMS><vICMS>33.16</vICMS></ICMS20></ICMS><PIS><PISAliq><CST>01</CST><vBC>243.16</vBC><pPIS>1.65</pPIS><vPIS>4.01</vPIS></PISAliq></PIS><COFINS><COFINSAliq><CST>01</CST><vBC>243.16</vBC><pCOFINS>7.60</pCOFINS><vCOFINS>18.48</vCOFINS></COFINSAliq></COFINS></imposto></det><total><ICMSTot><vBC>144.17</vBC><vICMS>33.16</vICMS><vICMSDeson>0</vICMSDeson><vFCPUFDest>0</vFCPUFDest><vICMSUFDest>0</vICMSUFDest><vICMSUFRemet>0</vICMSUFRemet><vFCP>0</vFCP><vBCST>0</vBCST><vST>0</vST><vFCPST>0</vFCPST><vFCPSTRet>0</vFCPSTRet><vProd>276.32</vProd><vFrete>0</vFrete><vSeg>0</vSeg><vDesc>0</vDesc><vII>0</vII><vIPI>0</vIPI><vIPIDevol>0</vIPIDevol><vPIS>4.01</vPIS><vCOFINS>18.48</vCOFINS><vOutro>0</vOutro><vNF>276.32</vNF></ICMSTot></total><transp><modFrete>0</modFrete><vol><qVol>22</qVol><esp>VOLUMES</esp><marca>DIVERSOS</marca><pesoL>22.480</pesoL><pesoB>22.480</pesoB></vol></transp><cobr><fat><nFat>9819586</nFat><vOrig>276.32</vOrig><vDesc>0</vDesc><vLiq>276.32</vLiq></fat><dup><nDup>001</nDup><dVenc>2025-10-15</dVenc><vDup>138.16</vDup></dup><dup><nDup>002</nDup><dVenc>2025-11-14</dVenc><vDup>138.16</vDup></dup></cobr><pag><detPag><tPag>14</tPag><vPag>276.32</vPag></detPag></pag><infAdic><infCpl>Pedido: 1010041994 Cliente: 3149890 Pedido 5826462 CONHECIMENTO: 7480706. PLACA: KLG-8E41 MOTORISTA: HUGO SOUSA CASTRO.#Existem 1 volumes VENDEDOR: EMERSON MENESES REPRESENTANTE COMERCIAL LTDA.</infCpl></infAdic></infNFe><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1" /><Reference URI="#NFe21250923439441003539550020098195861101004192"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" /><DigestValue>wZUMjRKzbKY4nIo79MPMABVrXTk=</DigestValue></Reference></SignedInfo><SignatureValue>Y6X0shVw8tNnmMtEyoKYNwRN/sqHxHZAnfzsGxMl0G2wy376gD6rhxO0QMlKzrjVkidu5SqpBoEJ
+zAHMbBgDYiK7Ow63Ehf+oKlJWvNSbeTDPqH4V4rBnL5uIxcZa6bRwaWR4XLVM2t+4btaA5mlpODU
+LSwHkJhPic2ir1zwRAs/bN2vEBO5DsfsPcWVIvpciToKFEiO1zgz+i7wXfWQv+I1kYD2xINdHIjs
+a/GVuhNPdPvGwfoHINUEyNqIYm4f7HKDlJxzVMkDUl04WAwj9yp125mmS1glzQ1eobU5yiendJ6/
+aXD+U+dZS8uT7kRYnQXnYtzbpEuaR9qU3kHarw==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIHQTCCBSmgAwIBAgIIWQwkEhM1VjgwDQYJKoZIhvcNAQELBQAwWTELMAkGA1UEBhMCQlIxEzAR
+BgNVBAoTCklDUC1CcmFzaWwxFTATBgNVBAsTDEFDIFNPTFVUSSB2NTEeMBwGA1UEAxMVQUMgU09M
+VVRJIE11bHRpcGxhIHY1MB4XDTI0MTIxMzExNTUwMFoXDTI1MTIxMzExNTUwMFowgeAxCzAJBgNV
+BAYTAkJSMRMwEQYDVQQKEwpJQ1AtQnJhc2lsMQswCQYDVQQIEwJNQTERMA8GA1UEBxMIU2FvIEx1
+aXMxHjAcBgNVBAsTFUFDIFNPTFVUSSBNdWx0aXBsYSB2NTEXMBUGA1UECxMOMzU2MjI0MDYwMDAx
+OTAxHDAaBgNVBAsTE0NlcnRpZmljYWRvIERpZ2l0YWwxGjAYBgNVBAsTEUNlcnRpZmljYWRvIFBK
+IEExMSkwJwYDVQQDEyBBUk1BWkVNIE1BVEVVUyBTQToyMzQzOTQ0MTAwMTMyMzCCASIwDQYJKoZI
+hvcNAQEBBQADggEPADCCAQoCggEBAJvKK/Xfigsv2qt6JGXWc2hnhSg+g8LZtOcOLfQtEYgqu55U
+4RdUBck6uMEKdoPLxq1bDQ+9VDiZ08M+ihVwAKZ3rCy718ujd9RsXvFCr+PX28ErDo2ZKKDD6NsX
+/EZbKIUEmL3l8pL3U2Zn6wweGE4Hz05qG+AEA5F5nR5Vl6NHutMFt6URGkuWRVixl9U3CVUk4sxU
+6BnqzIMCtjabWTQWloZIQO6ukNjE6HO2qGIm7/voSHAXLcW4RH7fXGBs23MvlpwhthPW2Qwf1rbG
+fVMN4SCV+rUu6RsnkCP055LvQufJ3LZiTV2EWq+e9+ftoRi/BhgSgkhr8P07fdOgMT8CAwEAAaOC
+AoMwggJ/MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAUxVLtJYAJ35yCyJ9Hxt20XzHdubEwVAYIKwYB
+BQUHAQEESDBGMEQGCCsGAQUFBzAChjhodHRwOi8vY2NkLmFjc29sdXRpLmNvbS5ici9sY3IvYWMt
+c29sdXRpLW11bHRpcGxhLXY1LnA3YjCBvgYDVR0RBIG2MIGzgSBjb3JyZWEuY2FybG9zQGdydXBv
+bWF0ZXVzLmNvbS5icqAhBgVgTAEDAqAYExZJTFNPTiBNQVRFVVMgUk9EUklHVUVToBkGBWBMAQMD
+oBATDjIzNDM5NDQxMDAxMzIzoDgGBWBMAQMEoC8TLTA2MDMxOTYzMjI1ODQwMTMzMDQwMDAwMDAw
+MDAwMDAwMDAwMDAwMDAwMDAwMKAXBgVgTAEDB6AOEwwwMDAwMDAwMDAwMDAwXQYDVR0gBFYwVDBS
+BgZgTAECASYwSDBGBggrBgEFBQcCARY6aHR0cDovL2NjZC5hY3NvbHV0aS5jb20uYnIvZG9jcy9k
+cGMtYWMtc29sdXRpLW11bHRpcGxhLnBkZjAdBgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwQw
+gYwGA1UdHwSBhDCBgTA+oDygOoY4aHR0cDovL2NjZC5hY3NvbHV0aS5jb20uYnIvbGNyL2FjLXNv
+bHV0aS1tdWx0aXBsYS12NS5jcmwwP6A9oDuGOWh0dHA6Ly9jY2QyLmFjc29sdXRpLmNvbS5ici9s
+Y3IvYWMtc29sdXRpLW11bHRpcGxhLXY1LmNybDAdBgNVHQ4EFgQUvx6bR+NUw7Lki6z+paXFsNB6
+etQwDgYDVR0PAQH/BAQDAgXgMA0GCSqGSIb3DQEBCwUAA4ICAQCXxqPN44QqqZDnNszlhXUeIbKZ
+EiexSD0hPQpOG8cRT6EwUySNxSH+6CZnxn7iD+mY7zG63X6RyFqvjY/xDddsgKkhXyRvvNZMBVK/
+EVBj7dzcAMINIiU+i3xE97ElpPL1eyrxG2JsHDluV6/k6V90Lxb5EjIbuqv76ee6Q2KW1F2x9Qb3
+VHGkPdYRL627kNe6jT8GE7B8TgoicoI34LMu/L+aYekcVE+5p3EHuDc4sKxZR0vZBXzyXmnIU/FZ
+1JyI/nQlKpPBp8U5d++kyZFiHtsLOgVqazPi/Rh7vDxZuMbd6DalpSGQWXiPbjYScFpzp9JlbMEu
+SHgFNDXUJMkAXPXr2b1Rf6Nub1XKsw3+I1WDx76H4v+MyxzaHqDXUsUaoxE+qk9G448kjVaR1Sdp
+MMsPnAqjr9oU13NFQ/h0L7OjMn72oNkttI83egDXbeqhu9jq0slmGW9tSoBKEEHSguAG/yZ7ENs1
+SdgucEdes/fFD/4EhvG88ECpsYPboqAAXrR8lnmVGOTKEA290ygfb02hJYgSZLxDcb55vFNRfqGU
++pzt1zJiQpE5j1I8B/VhZ+vAF8kjv2VY0CJ3UaKFUdT4D8BebcbUYIm6mCgca5ISrXe57lIZwrGn
+cOzdaJtTTM8ixifLFthva9wVvtpEgfhotSU8vwOiaBi9fMriOw==</X509Certificate></X509Data></KeyInfo></Signature></NFe><protNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><infProt Id="ID421250033558304"><tpAmb>1</tpAmb><verAplic>SVAN_2.3.10</verAplic><chNFe>21250923439441003539550020098195861101004192</chNFe><dhRecbto>2025-09-15T21:22:14-03:00</dhRecbto><nProt>421250033558304</nProt><digVal>wZUMjRKzbKY4nIo79MPMABVrXTk=</digVal><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></nfeProc>
