@@ -79,18 +79,20 @@ class FrontBoxController extends Controller
     private function validaCaixaAberto($funcionarios)
     {
         $temp = [];
-        $config = ConfigNota::where('empresa_id', request()->empresa_id)->first();
+
         foreach ($funcionarios as $f) {
-            $aberturaNfe = AberturaCaixa::where('empresa_id', request()->empresa_id)
-            ->when($config->caixa_por_usuario == 1, function ($q) use ($f) {
-                return $q->where('usuario_id', $f->usuario_id);
-            })
-            ->orderBy('id', 'desc')->first();
-            if ($aberturaNfe != null) {
-                if ($aberturaNfe->status == 0)
-                    array_push($temp, $f);
+            $abertura = AberturaCaixa::query()
+                ->where('empresa_id', request()->empresa_id)
+                ->where('usuario_id', $f->usuario_id)
+                ->where('status', 0)
+                ->orderBy('id', 'desc')
+                ->first();
+
+            if ($abertura) {
+                $temp[] = $f;
             }
         }
+
         return $temp;
     }
 
@@ -486,72 +488,68 @@ public function troca()
 
 public function fecharCaixa()
 {
-    $config = ConfigNota::where('empresa_id', request()->empresa_id)->first();
-        // $aberturaCaixa = AberturaCaixa::where('empresa_id', request()->empresa_id)->first();
-        // $aberturaCaixa->created_at;
-    $aberturaNfe = AberturaCaixa::where('ultima_venda_nfe', 0)
-    ->where('empresa_id', request()->empresa_id)
-    ->when($config->caixa_por_usuario == 1, function ($q) use ($config) {
-        return $q->where('usuario_id', get_id_user());
-    })->orderBy('id', 'desc')->first();
-    $aberturaNfce = AberturaCaixa::where('ultima_venda_nfce', 0)
-    ->where('empresa_id', request()->empresa_id)
-    ->when($config->caixa_por_usuario == 1, function ($q) use ($config) {
-        return $q->where('usuario_id', get_id_user());
-    })->orderBy('id', 'desc')->first();
-    $ultimaFechadaNfe = AberturaCaixa::where('ultima_venda_nfe', '>', 0)
-    ->where('empresa_id', request()->empresa_id)
-    ->when($config->caixa_por_usuario == 1, function ($q) use ($config) {
-        return $q->where('usuario_id', get_id_user());
-    })->orderBy('id', 'desc')->first();
-    $ultimaFechadaNfce = AberturaCaixa::where('ultima_venda_nfce', '>', 0)
-    ->where('empresa_id', request()->empresa_id)
-    ->when($config->caixa_por_usuario == 1, function ($q) use ($config) {
-        return $q->where('usuario_id', get_id_user());
-    })->orderBy('id', 'desc')->first();
-    $ultimaVendaCaixa = VendaCaixa::where('empresa_id', request()->empresa_id)
-    ->when($config->caixa_por_usuario == 1, function ($q) use ($config) {
-        return $q->where('usuario_id', get_id_user());
-    })->orderBy('id', 'desc')->first();
-    $ultimaVenda = Venda::where('empresa_id', request()->empresa_id)
-    ->when($config->caixa_por_usuario == 1, function ($q) use ($config) {
-        return $q->where('usuario_id', get_id_user());
-    })->orderBy('id', 'desc')->first();
-    $vendas = [];
-    $somaTiposPagamento = [];
-    if ($ultimaVendaCaixa != null || $ultimaVenda != null) {
-        $ultimaVendaCaixa = $ultimaVendaCaixa != null ? $ultimaVendaCaixa->id : 0;
-        $ultimaVenda = $ultimaVenda != null ? $ultimaVenda->id : 0;
-        $vendasPdv = VendaCaixa::whereBetween('id', [
-            ($ultimaFechadaNfce != null ? $ultimaFechadaNfce->ultima_venda_nfce + 1 : 0),
-            $ultimaVendaCaixa
-        ])
-        ->where('empresa_id', request()->empresa_id)
-        ->get();
-        $vendas = Venda::whereBetween('id', [
-            ($ultimaFechadaNfe != null ? $ultimaFechadaNfe->ultima_venda_nfe + 1 : 0),
-            $ultimaVenda
-        ])
-        ->where('empresa_id', request()->empresa_id)
-        ->get();
-        $vendas = $this->agrupaVendas($vendas, $vendasPdv);
-        $somaTiposPagamento = $this->somaTiposPagamento($vendas);
+    $empresaId = (int) request()->empresa_id;
+    $usuarioId = (int) get_id_user();
+
+    $config = ConfigNota::where('empresa_id', $empresaId)->first();
+    if (!$config) {
+        session()->flash('flash_erro', 'Configure o emitente antes de fechar o caixa.');
+        return redirect()->route('configNF.index');
     }
-    $abertura = $aberturaNfe != null ? $aberturaNfe : $aberturaNfce;
-    $movimentacaoFinanceira = $abertura
-        ? $this->consultarMovimentacaoFinanceira(
-            (int) request()->empresa_id,
-            $abertura->created_at,
-            now(),
-            $abertura->filial_id ? (int) $abertura->filial_id : null
-        )
-        : [
-            'contas_pagar' => collect(),
-            'contas_receber' => collect(),
-            'total_pagar' => 0.0,
-            'total_receber' => 0.0,
-            'saldo' => 0.0,
-        ];
+
+    // Uma abertura operacional sempre pertence a um único operador.
+    // A configuração caixa_por_usuario não pode fazer dois caixas compartilharem a mesma sessão.
+    $abertura = AberturaCaixa::query()
+        ->where('empresa_id', $empresaId)
+        ->where('usuario_id', $usuarioId)
+        ->where('status', 0)
+        ->orderBy('id', 'desc')
+        ->first();
+
+    if (!$abertura) {
+        session()->flash('flash_warning', 'Não existe caixa aberto para este usuário.');
+        return redirect()->route('caixa.index');
+    }
+
+    $ultimaVendaCaixaId = (int) (VendaCaixa::query()
+        ->where('empresa_id', $empresaId)
+        ->where('usuario_id', $usuarioId)
+        ->max('id') ?? 0);
+
+    $ultimaVendaId = (int) (Venda::query()
+        ->where('empresa_id', $empresaId)
+        ->where('usuario_id', $usuarioId)
+        ->max('id') ?? 0);
+
+    $vendasPdv = collect();
+    if ($ultimaVendaCaixaId > (int) $abertura->primeira_venda_nfce) {
+        $vendasPdv = VendaCaixa::query()
+            ->where('empresa_id', $empresaId)
+            ->where('usuario_id', $usuarioId)
+            ->where('id', '>', (int) $abertura->primeira_venda_nfce)
+            ->where('id', '<=', $ultimaVendaCaixaId)
+            ->get();
+    }
+
+    $vendasNfe = collect();
+    if ($ultimaVendaId > (int) $abertura->primeira_venda_nfe) {
+        $vendasNfe = Venda::query()
+            ->where('empresa_id', $empresaId)
+            ->where('usuario_id', $usuarioId)
+            ->where('id', '>', (int) $abertura->primeira_venda_nfe)
+            ->where('id', '<=', $ultimaVendaId)
+            ->get();
+    }
+
+    $vendas = $this->agrupaVendas($vendasNfe, $vendasPdv);
+    $somaTiposPagamento = $this->somaTiposPagamento($vendas);
+
+    $movimentacaoFinanceira = $this->consultarMovimentacaoFinanceira(
+        $empresaId,
+        $abertura->created_at,
+        now(),
+        $abertura->filial_id ? (int) $abertura->filial_id : null
+    );
 
     return view('frontBox.fechamento', compact(
         'vendas',
@@ -796,26 +794,78 @@ public function detalhes($id)
 
 public function fecharPost(Request $request)
 {
-    $id = $request->abertura_id;
-    $abertura = AberturaCaixa::findOrFail($id);
-    $ultimaVendaCaixa = VendaCaixa::where('empresa_id', $request->empresa_id)
-    ->orderBy('id', 'desc')->first();
-    $ultimaVenda = Venda::where('empresa_id', $request->empresa_id)
-    ->orderBy('id', 'desc')->first();
+    $empresaId = (int) request()->empresa_id;
+    $usuarioId = (int) get_id_user();
+    $aberturaId = (int) $request->abertura_id;
+
     try {
-        $abertura->ultima_venda_nfce = $ultimaVendaCaixa != null ? $ultimaVendaCaixa->id : 0;
-        $abertura->ultima_venda_nfe = $ultimaVenda != null ? $ultimaVenda->id : 0;
-        $abertura->status = true;
-        $abertura->valor_dinheiro_caixa = __convert_value_bd($request->valor_dinheiro_caixa);
-        $abertura->save();
-        session()->flash("flash_sucesso", "Caixa fechado com sucesso!");
+        DB::transaction(function () use ($request, $empresaId, $usuarioId, $aberturaId) {
+            // Lock da abertura evita dois fechamentos concorrentes da mesma sessão.
+            $abertura = AberturaCaixa::query()
+                ->where('id', $aberturaId)
+                ->where('empresa_id', $empresaId)
+                ->where('usuario_id', $usuarioId)
+                ->where('status', 0)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$abertura) {
+                throw new \DomainException(
+                    'Este caixa não está aberto para o usuário atual ou já foi fechado.'
+                );
+            }
+
+            $ultimaVendaNfceId = (int) (VendaCaixa::query()
+                ->where('empresa_id', $empresaId)
+                ->where('usuario_id', $usuarioId)
+                ->max('id') ?? 0);
+
+            $ultimaVendaNfeId = (int) (Venda::query()
+                ->where('empresa_id', $empresaId)
+                ->where('usuario_id', $usuarioId)
+                ->max('id') ?? 0);
+
+            $quantidadeVendasPdv = VendaCaixa::query()
+                ->where('empresa_id', $empresaId)
+                ->where('usuario_id', $usuarioId)
+                ->where('id', '>', (int) $abertura->primeira_venda_nfce)
+                ->count();
+
+            $quantidadeVendasNfe = Venda::query()
+                ->where('empresa_id', $empresaId)
+                ->where('usuario_id', $usuarioId)
+                ->where('id', '>', (int) $abertura->primeira_venda_nfe)
+                ->count();
+
+            if (($quantidadeVendasPdv + $quantidadeVendasNfe) === 0) {
+                throw new \DomainException('Não é possível fechar o caixa sem nenhuma venda.');
+            }
+
+            $abertura->ultima_venda_nfce = $ultimaVendaNfceId > (int) $abertura->primeira_venda_nfce
+                ? $ultimaVendaNfceId
+                : (int) $abertura->primeira_venda_nfce;
+            $abertura->ultima_venda_nfe = $ultimaVendaNfeId > (int) $abertura->primeira_venda_nfe
+                ? $ultimaVendaNfeId
+                : (int) $abertura->primeira_venda_nfe;
+            $abertura->status = true;
+            $abertura->valor_dinheiro_caixa = $request->filled('valor_dinheiro_caixa')
+                ? __convert_value_bd($request->valor_dinheiro_caixa)
+                : 0;
+            $abertura->save();
+        });
+
+        session()->flash('flash_sucesso', 'Caixa fechado com sucesso!');
+    } catch (\DomainException $e) {
+        session()->flash('flash_warning', $e->getMessage());
     } catch (\Exception $e) {
-        session()->flash("flash_erro", "Algo deu errado" . $e->getMessage());
-        __saveLogError($e, request()->empresa_id);
+        session()->flash('flash_erro', 'Não foi possível fechar o caixa: ' . $e->getMessage());
+        __saveLogError($e, $empresaId);
     }
+
     if (isset($request->redirect)) {
         return redirect($request->redirect);
     }
+
     return redirect()->route('frenteCaixa.list');
 }
 
