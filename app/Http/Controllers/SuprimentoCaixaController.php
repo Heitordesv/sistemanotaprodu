@@ -2,20 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AberturaCaixa;
 use App\Models\SuprimentoCaixa;
 use Illuminate\Http\Request;
 
 class SuprimentoCaixaController extends Controller
 {
     protected $empresa_id = null;
+
     public function __construct()
     {
         $this->middleware(function ($request, $next) {
             $this->empresa_id = $request->empresa_id;
             $value = session('user_logged');
+
             if (!$value) {
-                return redirect("/login");
+                return redirect('/login');
             }
+
             return $next($request);
         });
     }
@@ -32,6 +36,7 @@ class SuprimentoCaixaController extends Controller
         $empresa_id = is_object($user) ? $user->empresa_id : $user['empresa'];
         $usuario_id = is_object($user) ? $user->id : $user['id'];
 
+        // O suprimento pertence exclusivamente ao caixa aberto do operador atual.
         $caixaAberto = AberturaCaixa::where('empresa_id', $empresa_id)
             ->where('usuario_id', $usuario_id)
             ->where('status', 0)
@@ -48,12 +53,15 @@ class SuprimentoCaixaController extends Controller
                 'usuario_id' => $usuario_id,
                 'valor' => __convert_value_bd($request->valor),
                 'observacao' => $request->observacao ?? '',
-                'empresa_id' => $empresa_id
+                'empresa_id' => $empresa_id,
             ]);
 
-            session()->flash("flash_sucesso", "Suprimento realizado com sucesso!");
+            session()->flash(
+                'flash_sucesso',
+                'Suprimento realizado com sucesso no Caixa #' . $caixaAberto->id . '!'
+            );
         } catch (\Exception $e) {
-            session()->flash("flash_erro", "Algo deu errado: " . $e->getMessage());
+            session()->flash('flash_erro', 'Algo deu errado: ' . $e->getMessage());
             __saveLogError($e, $empresa_id);
         }
 
