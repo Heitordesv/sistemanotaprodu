@@ -104,6 +104,66 @@ class ContaReceberPagamentoController extends Controller
         }
     }
 
+    public function receberMassa(Request $request, ContaReceberPagamentoService $service)
+    {
+        $formasValidas = array_values(array_diff(
+            array_keys(ContaReceber::tiposPagamento()),
+            ['06', '90']
+        ));
+
+        $validated = $request->validate([
+            'ids' => ['required'],
+            'tipo_pagamento' => ['required', Rule::in($formasValidas)],
+            'data_recebimento' => ['nullable', 'date'],
+            'lote_pagamento' => ['nullable', 'uuid'],
+        ], [
+            'ids.required' => 'Selecione ao menos uma conta.',
+            'tipo_pagamento.required' => 'Informe a forma de pagamento do recebimento em massa.',
+            'tipo_pagamento.in' => 'Forma de pagamento inválida para recebimento.',
+        ]);
+
+        $ids = is_array($validated['ids'])
+            ? $validated['ids']
+            : explode(',', (string) $validated['ids']);
+
+        $user = session('user_logged');
+        $empresaId = (int) (is_object($user)
+            ? ($user->empresa_id ?? 0)
+            : ($user['empresa'] ?? $user['empresa_id'] ?? 0));
+
+        if ($empresaId <= 0) {
+            abort(403, 'Empresa da sessão não identificada.');
+        }
+
+        try {
+            $resultado = $service->registrarMassa(
+                $ids,
+                $empresaId,
+                $validated['tipo_pagamento'],
+                $validated['data_recebimento'] ?? now()->toDateString(),
+                $validated['lote_pagamento'] ?? (string) Str::uuid()
+            );
+
+            $forma = ContaReceber::tiposPagamento()[$validated['tipo_pagamento']] ?? $validated['tipo_pagamento'];
+
+            return redirect()->back()->with(
+                'flash_sucesso',
+                $resultado['quantidade'] . ' conta(s) recebida(s) via ' . $forma .
+                '. Total: R$ ' . number_format($resultado['total'], 2, ',', '.')
+            );
+        } catch (\Throwable $e) {
+            Log::error('Erro ao registrar recebimento em massa', [
+                'empresa_id' => $empresaId,
+                'ids' => $ids,
+                'erro' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()
+                ->withInput()
+                ->with('flash_erro', $e->getMessage());
+        }
+    }
+
     private function enviarConfirmacao(ContaReceber $item, float $valorRegistrado, float $restante): void
     {
         $cliente = Cliente::find($item->cliente_id);
