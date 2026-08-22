@@ -1,228 +1,286 @@
 @extends('default.layout',['title' => 'Caixa'])
 @section('content')
 <div class="page-content">
-    <div class="card ">
+    <div class="card">
         {!! Form::open()
         ->post()
         ->route('frenteCaixa.fecharPost')
         !!}
+
         <div class="card-body p-4">
-            <div class="page-breadcrumb d-sm-flex align-items-center mb-3">
-                <div class="ms-auto">
+            @php
+                $estado = $abertura != null;
+                $somaDinheiro = 0;
+                $somaSuprimento = 0;
+                $somaSangria = 0;
+                $soma = 0;
+            @endphp
+
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <div>
+                    <h4 class="mb-1">
+                        <i class="bx bx-calculator"></i>
+                        @if($estado)
+                            Caixa #{{ $abertura->id }}
+                        @else
+                            Caixa
+                        @endif
+                    </h4>
+                    @if($estado)
+                        <div class="text-muted">
+                            Operador: <strong>{{ $usuario->nome }}</strong>
+                            &nbsp;•&nbsp;
+                            Aberto em: <strong>{{ $abertura->created_at }}</strong>
+                        </div>
+                    @else
+                        <div class="text-muted">
+                            Operador: <strong>{{ $usuario->nome }}</strong>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    @if($estado)
+                        <span class="badge bg-success fs-6">CAIXA ABERTO</span>
+                    @else
+                        <span class="badge bg-secondary fs-6">CAIXA FECHADO</span>
+                    @endif
+
+                    @if($estado && empresaComFilial() && $abertura->filial)
+                        <span class="badge bg-info fs-6">
+                            {{ $abertura->filial->descricao }}
+                        </span>
+                    @endif
                 </div>
             </div>
-            @php
-            $estado = $abertura == null ? false : true;
-            @endphp
-            <div class="col">
-                <div class="row">
-                    <h6 class="mb-0 text-uppercase">Estado:
-                        @if($estado)
-                        <span class="btn btn-info btn-sm">Caixa aberto</span>
-                        @if(empresaComFilial())
-                        @if($abertura->filial)
-                        <span class="btn btn-success btn-sm">Local:
-                            <strong class="ml-1"> {{ $abertura->filial->descricao}}</strong>
-                        </span>
-                        @endif
-                        @endif
-                        @else
-                        <span class="btn btn-warning btn-sm">Caixa fechado</span>
-                        @endif
-                    </h6>
+
+            @if($estado)
+                <div class="alert alert-info py-2">
+                    <i class="bx bx-user me-1"></i>
+                    Esta sessão pertence somente ao <strong>Caixa #{{ $abertura->id }}</strong>
+                    do operador <strong>{{ $usuario->nome }}</strong>.
+                    As movimentações de outros operadores não entram neste caixa.
                 </div>
-                <div class="row mt-3">
-                    <div class="row">
-                        <div class="col-9">
-                            @if(!$estado)
-                            <a class="btn btn-primary px-4" data-bs-toggle="modal" data-bs-target="#modal-abrir_caixa"><i class="bx bx-money" style="margin-top: -17px"></i>Abrir caixa</a>
-                            @endif
-                            @if($estado)
-                            <a class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-suprimento_caixa"><i class="bx bx-money"></i> Suprimento de caixa</a>
-                            <a class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modal-sangria_caixa"><i class="bx bx-downvote"></i> Sangria de caixa</a>
-                            @endif
-                            <a class="btn btn-info px-4" href="{{ route('caixa.list') }}"><i class="bx bx-list-ol"></i>Lista</a>
-                        </div>
-                    </div>
+            @endif
+
+            <div class="row mt-3">
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    @if(!$estado)
+                        <a class="btn btn-primary px-4" data-bs-toggle="modal" data-bs-target="#modal-abrir_caixa">
+                            <i class="bx bx-money"></i> Abrir meu caixa
+                        </a>
+                    @endif
 
                     @if($estado)
-                    @if(sizeof($caixa) > 0)
-                    <div class="mt-4">
-                        <h5>Total de vendas: {{ sizeof($caixa['vendas']) }}</h5>
-                    </div>
-                    <div class="mt-3">
-                        <h5 style="color: blue">Valor de abertura: {{ __moeda($abertura->valor) }}</h5>
-                    </div>
-                    @endif
+                        <a class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-suprimento_caixa">
+                            <i class="bx bx-money"></i> Suprimento do Caixa #{{ $abertura->id }}
+                        </a>
+                        <a class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modal-sangria_caixa">
+                            <i class="bx bx-downvote"></i> Sangria do Caixa #{{ $abertura->id }}
+                        </a>
                     @endif
 
-                    @php
-                    $somaDinheiro = 0;
-                    @endphp
+                    <a class="btn btn-info px-4" href="{{ route('caixa.list') }}">
+                        <i class="bx bx-list-ol"></i> Lista de caixas
+                    </a>
+                </div>
+            </div>
 
-                    @if(sizeof($caixa) > 0)
-                    <div class="row mt-3">
-                        <h5>Total por tipo de pagamento:</h5>
-                        @foreach($caixa['somaTiposPagamento'] as $key => $tp)
-                        @if($tp > 0)
-                        <div class="col-sm-4 col-lg-4 col-md-6">
-                            <div class="card card-custom gutter-b">
-                                <div class="card-header">
-                                    <h3 class="card-title">
-                                        {{App\Models\VendaCaixa::getTipoPagamento($key)}}
-                                    </h3>
-                                </div>
-                                @php
-                                if($key == '01') $somaDinheiro = $tp;
-                                @endphp
-                                <div class="card-body">
-                                    <h4 class="text-success">R$ {{ __moeda($tp) }}</h4>
-                                </div>
+            @if($estado)
+                <div class="row g-3 mt-2">
+                    <div class="col-md-3">
+                        <div class="card border shadow-sm h-100">
+                            <div class="card-body">
+                                <small class="text-muted">Caixa</small>
+                                <h4 class="mb-0">#{{ $abertura->id }}</h4>
                             </div>
                         </div>
-                        @endif
-                        @endforeach
                     </div>
-                    @endif
-                </div>
-                <div class="card mt-3">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table mb-0 table-striped">
-                                <thead class="">
-                                    <tr>
-                                        <th>Cliente</th>
-                                        <th>Data</th>
-                                        <th>Tipo de pagamento</th>
-                                        <th>Estado</th>
-                                        <th>Nfce/Nfe</th>
-                                        <th>Tipo</th>
-                                        <th>Valor</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @php
-                                    $soma = 0;
-                                    @endphp
-
-                                    @if(sizeof($caixa) > 0)
-
-                                    @forelse ($caixa['vendas'] as $item)
-                                    <tr>
-                                        <td>{{ $item->cliente->razao_social ?? 'Consumidor' }}</td>
-                                        <td>{{ $item->created_at }}</td>
-                                        <td>
-                                            <span class="codigo" style="width: 100px;">
-                                                @if($item->tipo_pagamento == '99')
-                                                Outros
-                                                @else
-                                                {{$item->getTipoPagamento($item->tipo_pagamento)}}
-                                                @endif
-                                            </span>
-                                        </td>
-                                        <td>{{ $item->estado }} {{ $item->estado_emissao }}</td>
-                                        <td>{{ $item->NFcNumero }} {{ $item->numero_nfe }}</td>
-                                        <td>{{ $item->tipo }}</td>
-                                        <td>{{ __moeda($item->valor_total) }}</td>
-                                    </tr>
-                                    @if($item->estado != 'CANCELADO')
-                                    @php
-                                    if(!isset($item->cpf)){
-                                    $soma += $item->valor_total-$item->desconto+$item->acrescimo;
-                                    }else{
-                                    if(!$item->rascunho && !$item->consignado){
-                                    $soma += $item->valor_total;
-                                    }
-                                    }
-                                    @endphp
-                                    @endif
-                                    @empty
-                                    <tr>
-                                        <td colspan="7" class="text-center">Nada encontrado</td>
-                                    </tr>
-                                    @endforelse
-                                    @endif
-                                </tbody>
-                            </table>
+                    <div class="col-md-3">
+                        <div class="card border shadow-sm h-100">
+                            <div class="card-body">
+                                <small class="text-muted">Operador</small>
+                                <h5 class="mb-0">{{ $usuario->nome }}</h5>
+                            </div>
                         </div>
-                        @php
-                        $somaSuprimento = 0;
-                        $somaSangria = 0;
-                        @endphp
-                        @if(sizeof($caixa) > 0)
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border shadow-sm h-100">
+                            <div class="card-body">
+                                <small class="text-muted">Valor de abertura</small>
+                                <h5 class="mb-0 text-primary">R$ {{ __moeda($abertura->valor) }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border shadow-sm h-100">
+                            <div class="card-body">
+                                <small class="text-muted">Vendas deste caixa</small>
+                                <h4 class="mb-0">{{ sizeof($caixa['vendas'] ?? []) }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if(sizeof($caixa) > 0)
+                <div class="row mt-4">
+                    <h5>Total por tipo de pagamento</h5>
+                    @foreach($caixa['somaTiposPagamento'] as $key => $tp)
+                        @if($tp > 0)
+                            <div class="col-sm-4 col-lg-3 col-md-6 mb-3">
+                                <div class="card card-custom gutter-b h-100">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">
+                                            {{ App\Models\VendaCaixa::getTipoPagamento($key) }}
+                                        </h6>
+                                    </div>
+                                    @php
+                                        if($key == '01') $somaDinheiro = $tp;
+                                    @endphp
+                                    <div class="card-body">
+                                        <h4 class="text-success">R$ {{ __moeda($tp) }}</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table mb-0 table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Data</th>
+                                    <th>Tipo de pagamento</th>
+                                    <th>Estado</th>
+                                    <th>NFC-e / NF-e</th>
+                                    <th>Tipo</th>
+                                    <th>Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if(sizeof($caixa) > 0)
+                                    @forelse ($caixa['vendas'] as $item)
+                                        <tr>
+                                            <td>{{ $item->cliente->razao_social ?? 'Consumidor' }}</td>
+                                            <td>{{ $item->created_at }}</td>
+                                            <td>
+                                                @if($item->tipo_pagamento == '99')
+                                                    Outros
+                                                @else
+                                                    {{ $item->getTipoPagamento($item->tipo_pagamento) }}
+                                                @endif
+                                            </td>
+                                            <td>{{ $item->estado }} {{ $item->estado_emissao }}</td>
+                                            <td>{{ $item->NFcNumero }} {{ $item->numero_nfe }}</td>
+                                            <td>{{ $item->tipo }}</td>
+                                            <td>R$ {{ __moeda($item->valor_total) }}</td>
+                                        </tr>
+
+                                        @if($item->estado != 'CANCELADO')
+                                            @php
+                                                if(!isset($item->cpf)) {
+                                                    $soma += $item->valor_total - $item->desconto + $item->acrescimo;
+                                                } elseif(!$item->rascunho && !$item->consignado) {
+                                                    $soma += $item->valor_total;
+                                                }
+                                            @endphp
+                                        @endif
+                                    @empty
+                                        <tr>
+                                            <td colspan="7" class="text-center">Nenhuma venda neste caixa.</td>
+                                        </tr>
+                                    @endforelse
+                                @else
+                                    <tr>
+                                        <td colspan="7" class="text-center">Abra o seu caixa para iniciar as movimentações.</td>
+                                    </tr>
+                                @endif
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if(sizeof($caixa) > 0)
                         <div class="row mt-3">
                             <div class="col-12 col-xl-6">
                                 <div class="card card-custom gutter-b bg-light-info">
                                     <div class="card-body">
-                                        <h2 class="card-title">Suprimentos:</h2>
-                                        @if(sizeof($caixa['suprimentos']) > 0)
-                                        @foreach($caixa['suprimentos'] as $s)
-                                        <h4>Valor: R$ {{number_format($s->valor, 2, ',', '.')}}</h4>
-                                        @php
-                                        $somaSuprimento += $s->valor;
-                                        @endphp
-                                        @endforeach
-                                        @else
-                                        <h4>R$ 0,00</h4>
-                                        @endif
+                                        <h4 class="card-title">Suprimentos do Caixa #{{ $abertura->id }}</h4>
+                                        @forelse($caixa['suprimentos'] as $s)
+                                            <h5>R$ {{ number_format($s->valor, 2, ',', '.') }}</h5>
+                                            @php $somaSuprimento += $s->valor; @endphp
+                                        @empty
+                                            <h5>R$ 0,00</h5>
+                                        @endforelse
                                     </div>
                                 </div>
                             </div>
+
                             <div class="col-12 col-xl-6">
                                 <div class="card card-custom gutter-b bg-light-danger">
                                     <div class="card-body">
-                                        <h2 class="card-title">Sangrias:</h2>
-                                        @if(sizeof($caixa['sangrias']) > 0)
-                                        @foreach($caixa['sangrias'] as $s)
-                                        <h4>Valor: R$ {{number_format($s->valor, 2, ',', '.')}}</h4>
-                                        @php
-                                        $somaSangria += $s->valor;
-                                        @endphp
-                                        @endforeach
-                                        @else
-                                        <h4>R$ 0,00</h4>
-                                        @endif
+                                        <h4 class="card-title">Sangrias do Caixa #{{ $abertura->id }}</h4>
+                                        @forelse($caixa['sangrias'] as $s)
+                                            <h5>R$ {{ number_format($s->valor, 2, ',', '.') }}</h5>
+                                            @php $somaSangria += $s->valor; @endphp
+                                        @empty
+                                            <h5>R$ 0,00</h5>
+                                        @endforelse
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        @endif
-                    </div>
+                    @endif
                 </div>
-                @if($estado)
-                    
-                @if( sizeof($caixa['vendas']) == 0)
-                <h3 class="text-danger text-center">NÃO É POSSÍVEL FECHAR SEM NENHUMA VENDA</h3>
-                @else
-                <h3 class="text-warning">Soma de vendas:
-                    <strong>{{ __moeda($soma) }}</strong>
-                </h3>
-                <h3 class="text-info">Total caixa dinheiro:
-                    <strong>
-                        {{ __moeda(($somaDinheiro + $somaSuprimento + $abertura->valor) - $somaSangria) }}
-                    </strong>
-                </h3>
-                <h3 class="text-success">Total geral:
-                    <strong>
-                        {{ __moeda(($soma + $somaSuprimento + $abertura->valor) - $somaSangria) }}
-                    </strong>
-                </h3>
-                @endif
-                @endif
-
             </div>
-            <div class="row">
+
+            @if($estado)
+                @if(sizeof($caixa['vendas'] ?? []) == 0)
+                    <div class="alert alert-warning mt-3">
+                        Não é possível fechar o Caixa #{{ $abertura->id }} sem nenhuma venda.
+                    </div>
+                @else
+                    <div class="mt-3">
+                        <h5 class="text-warning">
+                            Soma de vendas: <strong>R$ {{ __moeda($soma) }}</strong>
+                        </h5>
+                        <h5 class="text-info">
+                            Total caixa em dinheiro:
+                            <strong>R$ {{ __moeda(($somaDinheiro + $somaSuprimento + $abertura->valor) - $somaSangria) }}</strong>
+                        </h5>
+                        <h5 class="text-success">
+                            Total geral:
+                            <strong>R$ {{ __moeda(($soma + $somaSuprimento + $abertura->valor) - $somaSangria) }}</strong>
+                        </h5>
+                    </div>
+                @endif
+            @endif
+
+            <div class="row mt-3">
                 <div class="col-12">
                     <input type="hidden" name="valor_dinheiro_caixa" id="valor_dinheiro_caixa">
-                    <input type="hidden" name="abertura_id" value="{{$abertura != null ? $abertura->id : 0}}">
+                    <input type="hidden" name="abertura_id" value="{{ $abertura != null ? $abertura->id : 0 }}">
                     <input type="hidden" name="redirect" value="/caixa">
-                    <button type="submit" @if(sizeof($caixa)==0 || sizeof($caixa['vendas'])==0 ) disabled @endif class="btn btn-lg btn-danger">
-                        <i class="bx bx-x" style="margin-top: -17px"></i>
-                        Fechar caixa
-                    </button>
+
+                    @if($estado)
+                        <button
+                            type="submit"
+                            @if(sizeof($caixa) == 0 || sizeof($caixa['vendas']) == 0) disabled @endif
+                            class="btn btn-lg btn-danger"
+                        >
+                            <i class="bx bx-x"></i>
+                            Fechar somente o Caixa #{{ $abertura->id }}
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
+
         {!! Form::close() !!}
     </div>
 </div>
