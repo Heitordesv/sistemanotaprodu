@@ -13,10 +13,12 @@ return new class extends Migration
         $this->addOpeningColumn('sangria_caixas', 'sangria_caixas_abertura_idx');
         $this->addOpeningColumn('suprimento_caixas', 'suprimento_caixas_abertura_idx');
         $this->addReceivableAuditColumns();
+        $this->createReceivableAuditTable();
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('conta_receber_recebimentos');
         $this->dropReceivableAuditColumns();
         $this->dropOpeningColumn('suprimento_caixas', 'suprimento_caixas_abertura_idx');
         $this->dropOpeningColumn('sangria_caixas', 'sangria_caixas_abertura_idx');
@@ -81,6 +83,25 @@ return new class extends Migration
             if ($addDate) {
                 $table->timestamp('received_at')->nullable();
             }
+        });
+    }
+
+    private function createReceivableAuditTable(): void
+    {
+        if (Schema::hasTable('conta_receber_recebimentos')) {
+            return;
+        }
+
+        Schema::create('conta_receber_recebimentos', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('conta_receber_id')->index('crr_conta_idx');
+            $table->unsignedInteger('empresa_id')->index('crr_empresa_idx');
+            $table->unsignedInteger('abertura_caixa_id')->nullable()->index('crr_abertura_idx');
+            $table->unsignedInteger('usuario_id')->nullable()->index('crr_usuario_idx');
+            $table->decimal('valor', 16, 7);
+            $table->string('tipo_pagamento', 50)->nullable();
+            $table->timestamp('received_at')->nullable();
+            $table->timestamps();
         });
     }
 
