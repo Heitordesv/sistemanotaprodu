@@ -45,15 +45,8 @@ $(function () {
             }
             tipo.value = result.value;
 
-            let data = form.querySelector('input[name="data_recebimento"]');
-            if (!data) {
-                data = document.createElement('input');
-                data.type = 'hidden';
-                data.name = 'data_recebimento';
-                form.appendChild(data);
-            }
-            data.value = new Date().toISOString().slice(0, 10);
-
+            // A data não é calculada no navegador para evitar diferença de fuso.
+            // O backend usa now()->toDateString() quando data_recebimento não é enviada.
             form.submit();
         });
     });
