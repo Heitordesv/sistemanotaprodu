@@ -33,6 +33,7 @@
                             <tr>
                                 <th>Data Abertura</th>
                                 <th>Valor de abertura</th>
+                                <th>Estado</th>
                                 <th>Data Fechamento</th>
                                 <th>Usuário</th>
                                 <th>Ações</th>
@@ -41,9 +42,18 @@
                         <tbody>
                             @forelse ($data as $item)
                             <tr>
-                                <td>{{ $item->data_registro }}</td>
-                                <td>{{ __moeda($item->valor) }}</td>
-                                <td>{{ ($item->updated_at == $item->created_at) ? 'Caixa aberto' :  $item->updated_at }} </td>
+                                <td>{{ $item->data_registro ?? $item->created_at }}</td>
+                                <td>R$ {{ __moeda($item->valor) }}</td>
+                                <td>
+                                    @if((int) $item->status === 0)
+                                        <span class="badge bg-success">Aberto</span>
+                                    @else
+                                        <span class="badge bg-secondary">Fechado</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    {{ (int) $item->status === 0 ? '--' : $item->updated_at }}
+                                </td>
                                 <td>{{ $item->usuario->nome }}</td>
                                 <td>
                                     <a class="btn btn-primary btn-sm" href="{{ route('caixa.detalhes', $item->id) }}"><i class="bx bx-list-ol"></i></a>
@@ -51,7 +61,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="4" class="text-center">Nada encontrado</td>
+                                <td colspan="6" class="text-center">Nada encontrado</td>
                             </tr>
                             @endforelse
                         </tbody>
