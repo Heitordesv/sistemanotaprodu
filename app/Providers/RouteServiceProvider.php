@@ -86,6 +86,18 @@ class RouteServiceProvider extends ServiceProvider
 
             /*
             |--------------------------------------------------------------------------
+            | Fluxo Financeiro - Fechamento de Caixa
+            |--------------------------------------------------------------------------
+            |
+            | Carregado após web.php para manter a URL legada e substituir apenas
+            | o fechamento por um fluxo transacional que aceita caixa sem vendas.
+            |
+            */
+            $this->loadWebRoutes('routes/caixa_fluxo.php');
+
+
+            /*
+            |--------------------------------------------------------------------------
             | Segurança E-commerce
             |--------------------------------------------------------------------------
             */
