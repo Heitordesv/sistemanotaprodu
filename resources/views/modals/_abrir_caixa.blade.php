@@ -27,4 +27,26 @@
 
 @section('js')
 <script src="/js/caixa.js"></script>
+<script>
+    // O PDV usa Bootstrap 5. A abertura automática precisa usar a API nativa,
+    // pois $.fn.modal foi removido a partir do Bootstrap 5.
+    window.validaCaixa = function () {
+        const abertura = document.getElementById('abertura');
+
+        if (!abertura || abertura.value) {
+            return;
+        }
+
+        const modalElement = document.getElementById('modal-abrir_caixa');
+        if (!modalElement || !window.bootstrap || !window.bootstrap.Modal) {
+            return;
+        }
+
+        window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        window.validaCaixa();
+    });
+</script>
 @endsection
