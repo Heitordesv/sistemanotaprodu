@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class ContaReceber extends Model
@@ -17,15 +19,125 @@ class ContaReceber extends Model
         'mercadopago_ticket_url', 'mercadopago_digitable_line', 'mercadopago_qr_code',
         'mercadopago_qr_code_base64', 'mercadopago_checkout_url', 'mercadopago_idempotency_key',
         'mercadopago_public_token', 'mercadopago_last_sync_at',
+        'abertura_caixa_id', 'received_by_user_id', 'received_at',
     ];
 
     protected $casts = [
         'mercadopago_last_sync_at' => 'datetime',
+        'received_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (ContaReceber $conta) {
+            if (!$conta->isDirty('valor_recebido')) {
+                return;
+            }
+
+            $anterior = (float) ($conta->getOriginal('valor_recebido') ?? 0);
+            $novo = (float) ($conta->valor_recebido ?? 0);
+
+            if ($novo <= $anterior) {
+                return;
+            }
+
+            $contexto = static::resolverContextoRecebimento($conta);
+
+            $conta->received_by_user_id = $contexto['usuario_id'];
+            $conta->abertura_caixa_id = $contexto['abertura_caixa_id'];
+            $conta->received_at = now();
+        });
+
+        static::updated(function (ContaReceber $conta) {
+            if (!$conta->wasChanged('valor_recebido')) {
+                return;
+            }
+
+            $anterior = (float) ($conta->getOriginal('valor_recebido') ?? 0);
+            $novo = (float) ($conta->valor_recebido ?? 0);
+            $valorRecebidoAgora = round($novo - $anterior, 7);
+
+            if ($valorRecebidoAgora <= 0 || !Schema::hasTable('conta_receber_recebimentos')) {
+                return;
+            }
+
+            DB::table('conta_receber_recebimentos')->insert([
+                'conta_receber_id' => (int) $conta->id,
+                'empresa_id' => (int) $conta->empresa_id,
+                'abertura_caixa_id' => $conta->abertura_caixa_id
+                    ? (int) $conta->abertura_caixa_id
+                    : null,
+                'usuario_id' => $conta->received_by_user_id
+                    ? (int) $conta->received_by_user_id
+                    : null,
+                'valor' => $valorRecebidoAgora,
+                'tipo_pagamento' => $conta->tipo_pagamento,
+                'received_at' => $conta->received_at ?: now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+    }
+
+    private static function resolverContextoRecebimento(ContaReceber $conta): array
+    {
+        $user = session('user_logged');
+
+        if (!$user) {
+            return [
+                'usuario_id' => null,
+                'abertura_caixa_id' => null,
+            ];
+        }
+
+        $empresaSessao = (int) (is_object($user)
+            ? ($user->empresa_id ?? 0)
+            : ($user['empresa'] ?? $user['empresa_id'] ?? 0));
+
+        $usuarioId = (int) (is_object($user)
+            ? ($user->id ?? 0)
+            : ($user['id'] ?? $user['usuario_id'] ?? 0));
+
+        if (
+            $empresaSessao <= 0 ||
+            $usuarioId <= 0 ||
+            $empresaSessao !== (int) $conta->empresa_id
+        ) {
+            return [
+                'usuario_id' => null,
+                'abertura_caixa_id' => null,
+            ];
+        }
+
+        $abertura = AberturaCaixa::query()
+            ->where('empresa_id', $empresaSessao)
+            ->where('usuario_id', $usuarioId)
+            ->where('status', 0)
+            ->when($conta->filial_id, function ($query) use ($conta) {
+                return $query->where('filial_id', (int) $conta->filial_id);
+            })
+            ->orderByDesc('id')
+            ->first();
+
+        return [
+            'usuario_id' => $usuarioId,
+            'abertura_caixa_id' => $abertura ? (int) $abertura->id : null,
+        ];
+    }
 
     public function filial()
     {
         return $this->belongsTo(Filial::class, 'filial_id');
+    }
+
+    public function aberturaCaixa()
+    {
+        return $this->belongsTo(AberturaCaixa::class, 'abertura_caixa_id');
+    }
+
+    public function recebidoPor()
+    {
+        return $this->belongsTo(Usuario::class, 'received_by_user_id');
     }
 
     public function venda()
