@@ -87,6 +87,92 @@ class ContaReceberPagamentoService
         });
     }
 
+    /**
+     * Quita, em uma única transação, as contas selecionadas usando a forma de
+     * pagamento realmente informada pelo operador. O save de cada conta dispara
+     * o histórico de caixa (conta_receber_recebimentos) dentro da mesma transação.
+     */
+    public function registrarMassa(
+        array $ids,
+        int $empresaId,
+        string $formaPagamento,
+        string $dataPagamento,
+        ?string $loteUuid = null
+    ): array {
+        $ids = collect($ids)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            throw new RuntimeException('Nenhuma conta válida foi selecionada.');
+        }
+
+        return DB::transaction(function () use ($ids, $empresaId, $formaPagamento, $dataPagamento, $loteUuid) {
+            if ($loteUuid && ContaReceberPagamento::where('lote_uuid', $loteUuid)->exists()) {
+                return ['quantidade' => 0, 'total' => 0.0, 'idempotente' => true];
+            }
+
+            $contas = ContaReceber::query()
+                ->where('empresa_id', $empresaId)
+                ->whereIn('id', $ids->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($contas->count() !== $ids->count()) {
+                throw new RuntimeException('Uma ou mais contas selecionadas não pertencem à empresa atual ou não existem.');
+            }
+
+            $quantidade = 0;
+            $total = 0.0;
+
+            foreach ($contas as $conta) {
+                $valorIntegral = round((float) $conta->valor_integral, 2);
+                $recebidoAtual = round((float) $conta->valor_recebido, 2);
+                $saldo = round(max(0, $valorIntegral - $recebidoAtual), 2);
+
+                if ($saldo <= 0 || (int) $conta->status === 1) {
+                    continue;
+                }
+
+                ContaReceberPagamento::create([
+                    'conta_receber_id' => $conta->id,
+                    'empresa_id' => $conta->empresa_id,
+                    'valor' => $saldo,
+                    'forma_pagamento' => $formaPagamento,
+                    'data_pagamento' => $dataPagamento,
+                    'origem' => 'manual',
+                    'provedor' => null,
+                    'external_id' => null,
+                    'lote_uuid' => $loteUuid,
+                    'status' => 'confirmado',
+                    'observacao' => 'Recebimento em massa',
+                ]);
+
+                $conta->valor_recebido = $valorIntegral;
+                $conta->status = 1;
+                $conta->data_recebimento = $dataPagamento;
+                $conta->tipo_pagamento = $formaPagamento;
+                $conta->save();
+
+                $quantidade++;
+                $total += $saldo;
+            }
+
+            if ($quantidade === 0) {
+                throw new RuntimeException('As contas selecionadas já estão quitadas.');
+            }
+
+            return [
+                'quantidade' => $quantidade,
+                'total' => round($total, 2),
+                'idempotente' => false,
+            ];
+        });
+    }
+
     private function converterValor($valor): float
     {
         if (is_numeric($valor)) {
