@@ -12,3 +12,9 @@ Route::middleware('web')->prefix('contasReceber')->group(function () {
         ->whereNumber('id')
         ->name('conta-receber.payPut');
 });
+
+// Sobrescreve a rota legada carregada em web.php. A URL é preservada para
+// não quebrar a tela atual, mas o processamento passa pelo serviço transacional.
+Route::middleware('web')
+    ->post('/receber-massa', [ContaReceberPagamentoController::class, 'receberMassa'])
+    ->name('conta-receber.receber.massa');
