@@ -47,9 +47,13 @@
                     </tbody><tfoot><tr><th colspan="4">Total de recebimentos</th><th class="text-end">R$ {{ __moeda($resumoCaixa['totalRecebimentos']) }}</th></tr></tfoot>
                 </table></div></div>
 
-                @if(sizeof($vendas) == 0)<div class="alert alert-warning mt-3">Não é possível fechar este caixa sem nenhuma venda.</div>@endif
+                @if(sizeof($vendas) == 0 && $resumoCaixa['totalRecebimentos'] > 0)
+                    <div class="alert alert-success mt-3"><i class="bx bx-check-circle me-1"></i> Este caixa possui recebimentos de contas e pode ser fechado normalmente mesmo sem vendas.</div>
+                @elseif(sizeof($vendas) == 0)
+                    <div class="alert alert-light border mt-3"><i class="bx bx-info-circle me-1"></i> Este caixa não possui vendas. O fechamento continua permitido e preservará os demais movimentos registrados.</div>
+                @endif
                 <div class="alert alert-secondary mt-3">PIX/cartão entram no resultado financeiro. Somente dinheiro entra fisicamente na gaveta.</div>
-                <div class="mt-3"><button @if(sizeof($vendas) == 0) disabled @endif class="btn btn-warning" type="submit"><i class="bx bx-lock-alt"></i> Fechar somente o Caixa #{{ $abertura->id }}</button></div>
+                <div class="mt-3"><button class="btn btn-warning" type="submit"><i class="bx bx-lock-alt"></i> Fechar somente o Caixa #{{ $abertura->id }}</button></div>
                 {!! Form::close() !!}
             @else
                 <div class="alert alert-warning mb-0">Não existe caixa aberto para este usuário.</div>
