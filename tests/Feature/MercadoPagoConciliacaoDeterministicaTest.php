@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\ContaReceberMercadoPagoController;
+use App\Models\ContaReceber;
 use App\Services\ContaReceberMercadoPagoService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,13 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
             $table->decimal('valor_integral', 15, 2)->default(0);
             $table->decimal('valor_recebido', 15, 2)->default(0);
             $table->boolean('status')->default(false);
+            $table->string('tipo_pagamento', 10)->nullable();
+            $table->timestamp('data_recebimento')->nullable();
+            $table->string('mercadopago_status')->nullable();
+            $table->string('mercadopago_payment_id')->nullable();
+            $table->unsignedBigInteger('received_by_user_id')->nullable();
+            $table->unsignedBigInteger('abertura_caixa_id')->nullable();
+            $table->timestamp('received_at')->nullable();
             $table->timestamps();
         });
 
@@ -44,6 +52,10 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
             'valor_integral' => 45,
             'valor_recebido' => 0,
             'status' => 0,
+            'tipo_pagamento' => null,
+            'data_recebimento' => null,
+            'mercadopago_status' => null,
+            'mercadopago_payment_id' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -106,5 +118,54 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
             $payload['erro'] ?? null
         );
         $this->assertTrue(session()->has('user_logged'));
+    }
+
+    public function test_aprovacao_tardia_nao_deixa_valor_recebido_ultrapassar_valor_integral(): void
+    {
+        // Sem sessão durante conciliação automática: evita resolução de caixa e
+        // reproduz o comportamento do webhook/retorno público.
+        session()->forget('user_logged');
+
+        $conta = ContaReceber::findOrFail(10);
+        $conta->mercadopago_status = 'approved';
+        $conta->mercadopago_payment_id = 'mp-over-1';
+        $conta->tipo_pagamento = '17';
+        $conta->data_recebimento = now();
+        $conta->valor_recebido = 60;
+        $conta->save();
+
+        $conta->refresh();
+        $this->assertSame(45.0, (float) $conta->valor_recebido);
+        $this->assertSame('17', (string) $conta->tipo_pagamento);
+    }
+
+    public function test_aprovacao_tardia_em_conta_ja_quitada_preserva_forma_e_data_da_baixa_original(): void
+    {
+        $dataOriginal = now()->subDay()->startOfSecond();
+
+        DB::table('conta_recebers')->where('id', 10)->update([
+            'valor_recebido' => 45,
+            'status' => 1,
+            'tipo_pagamento' => '01',
+            'data_recebimento' => $dataOriginal,
+        ]);
+
+        session()->forget('user_logged');
+
+        $conta = ContaReceber::findOrFail(10);
+        $conta->mercadopago_status = 'approved';
+        $conta->mercadopago_payment_id = 'mp-over-2';
+        $conta->tipo_pagamento = '17';
+        $conta->data_recebimento = now();
+        $conta->valor_recebido = 90;
+        $conta->save();
+
+        $conta->refresh();
+        $this->assertSame(45.0, (float) $conta->valor_recebido);
+        $this->assertSame('01', (string) $conta->tipo_pagamento);
+        $this->assertSame(
+            $dataOriginal->format('Y-m-d H:i:s'),
+            optional($conta->data_recebimento)->format('Y-m-d H:i:s')
+        );
     }
 }
