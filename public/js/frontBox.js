@@ -997,7 +997,7 @@ function gerarNfce(venda) {
         'Aguarde a autorização da nota fiscal.'
     );
 
-    $.post(path_url + 'api/nfce/transmitir', {
+    $.post(window.pdvNfceTransmitirUrl || path_url + 'api/nfce/transmitir', {
         id: venda.id,
         empresa_id: empresa_id,
     })
