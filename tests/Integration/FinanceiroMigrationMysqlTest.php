@@ -126,10 +126,69 @@ class FinanceiroMigrationMysqlTest extends TestCase
         $this->assertSame(1, DB::table('conta_receber_pagamentos')->where('legado', 'preservar')->count());
     }
 
+    public function test_migration_010000_down_preserva_vinculos_e_historico_financeiro(): void
+    {
+        foreach (['venda_caixas', 'vendas', 'sangria_caixas', 'suprimento_caixas'] as $tabela) {
+            Schema::create($tabela, function (Blueprint $table) {
+                $table->increments('id');
+                $table->unsignedInteger('empresa_id')->default(1);
+            });
+        }
+
+        Schema::create('conta_recebers', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('empresa_id')->default(1);
+        });
+
+        $migration = require database_path('migrations/2026_08_22_010000_add_abertura_caixa_id_to_cash_movements.php');
+        $migration->up();
+
+        foreach (['venda_caixas', 'vendas', 'sangria_caixas', 'suprimento_caixas'] as $tabela) {
+            $this->assertTrue(Schema::hasColumn($tabela, 'abertura_caixa_id'));
+        }
+
+        foreach (['abertura_caixa_id', 'received_by_user_id', 'received_at'] as $coluna) {
+            $this->assertTrue(Schema::hasColumn('conta_recebers', $coluna));
+        }
+
+        $this->assertTrue(Schema::hasTable('conta_receber_recebimentos'));
+
+        DB::table('conta_receber_recebimentos')->insert([
+            'conta_receber_id' => 10,
+            'empresa_id' => 1,
+            'abertura_caixa_id' => 20,
+            'usuario_id' => 7,
+            'valor' => 45,
+            'tipo_pagamento' => '01',
+            'received_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $migration->down();
+
+        // O rollback não pode apagar trilha financeira nem os vínculos que já
+        // podem ter sido usados por caixas fechados em produção.
+        $this->assertTrue(Schema::hasTable('conta_receber_recebimentos'));
+        $this->assertSame(1, DB::table('conta_receber_recebimentos')->count());
+
+        foreach (['venda_caixas', 'vendas', 'sangria_caixas', 'suprimento_caixas'] as $tabela) {
+            $this->assertTrue(Schema::hasColumn($tabela, 'abertura_caixa_id'));
+        }
+
+        foreach (['abertura_caixa_id', 'received_by_user_id', 'received_at'] as $coluna) {
+            $this->assertTrue(Schema::hasColumn('conta_recebers', $coluna));
+        }
+    }
+
     private function limparTabelas(): void
     {
         Schema::dropIfExists('conta_receber_recebimentos');
         Schema::dropIfExists('conta_receber_pagamentos');
         Schema::dropIfExists('conta_recebers');
+        Schema::dropIfExists('suprimento_caixas');
+        Schema::dropIfExists('sangria_caixas');
+        Schema::dropIfExists('vendas');
+        Schema::dropIfExists('venda_caixas');
     }
 }

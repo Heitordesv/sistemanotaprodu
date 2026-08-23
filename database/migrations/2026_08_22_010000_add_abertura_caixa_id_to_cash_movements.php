@@ -18,12 +18,13 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('conta_receber_recebimentos');
-        $this->dropReceivableAuditColumns();
-        $this->dropOpeningColumn('suprimento_caixas', 'suprimento_caixas_abertura_idx');
-        $this->dropOpeningColumn('sangria_caixas', 'sangria_caixas_abertura_idx');
-        $this->dropOpeningColumn('vendas', 'vendas_abertura_idx');
-        $this->dropOpeningColumn('venda_caixas', 'venda_caixas_abertura_idx');
+        // Intencionalmente não destrutivo.
+        // Esta migration introduz vínculos e histórico de auditoria financeira.
+        // Remover tabela/colunas em rollback apagaria evidências de recebimentos
+        // e poderia corromper fechamentos de caixa já realizados.
+        //
+        // Caso seja necessária uma reversão estrutural, ela deve ser feita por
+        // migration corretiva explícita, com backup, validação e plano de dados.
     }
 
     private function addOpeningColumn(string $tableName, string $indexName): void
@@ -38,18 +39,6 @@ return new class extends Migration
             $table->unsignedInteger('abertura_caixa_id')
                 ->nullable()
                 ->index($indexName);
-        });
-    }
-
-    private function dropOpeningColumn(string $tableName, string $indexName): void
-    {
-        if (!Schema::hasTable($tableName) || !Schema::hasColumn($tableName, 'abertura_caixa_id')) {
-            return;
-        }
-
-        Schema::table($tableName, function (Blueprint $table) use ($indexName) {
-            $table->dropIndex($indexName);
-            $table->dropColumn('abertura_caixa_id');
         });
     }
 
@@ -103,32 +92,5 @@ return new class extends Migration
             $table->timestamp('received_at')->nullable();
             $table->timestamps();
         });
-    }
-
-    private function dropReceivableAuditColumns(): void
-    {
-        if (!Schema::hasTable('conta_recebers')) {
-            return;
-        }
-
-        if (Schema::hasColumn('conta_recebers', 'received_by_user_id')) {
-            Schema::table('conta_recebers', function (Blueprint $table) {
-                $table->dropIndex('conta_recebers_recebedor_idx');
-                $table->dropColumn('received_by_user_id');
-            });
-        }
-
-        if (Schema::hasColumn('conta_recebers', 'abertura_caixa_id')) {
-            Schema::table('conta_recebers', function (Blueprint $table) {
-                $table->dropIndex('conta_recebers_abertura_idx');
-                $table->dropColumn('abertura_caixa_id');
-            });
-        }
-
-        if (Schema::hasColumn('conta_recebers', 'received_at')) {
-            Schema::table('conta_recebers', function (Blueprint $table) {
-                $table->dropColumn('received_at');
-            });
-        }
     }
 };
