@@ -106,6 +106,18 @@ class RouteServiceProvider extends ServiceProvider
 
             /*
             |--------------------------------------------------------------------------
+            | Segurança Fiscal / Segredos
+            |--------------------------------------------------------------------------
+            |
+            | Carregado após web.php para neutralizar mutações de segredo por GET e
+            | expor somente as variantes POST protegidas por CSRF.
+            |
+            */
+            $this->loadWebRoutes('routes/fiscal_security.php');
+
+
+            /*
+            |--------------------------------------------------------------------------
             | Segurança Operacional
             |--------------------------------------------------------------------------
             |
