@@ -27,18 +27,43 @@ class CaixaMovimentacaoService
         }
 
         return DB::transaction(function () use ($empresaId, $usuarioId, $operacao, $caixaObrigatorio) {
-            $abertura = AberturaCaixa::query()
+            // Resolve a abertura candidata sem range lock e depois bloqueia
+            // exclusivamente sua PK. Assim, fechamento e movimentação disputam
+            // a mesma linha sem introduzir next-key locks sobre status/usuário.
+            $candidata = AberturaCaixa::query()
                 ->where('empresa_id', $empresaId)
                 ->where('usuario_id', $usuarioId)
                 ->where('status', 0)
                 ->orderByDesc('id')
+                ->value('id');
+
+            if (!$candidata) {
+                if ($caixaObrigatorio) {
+                    throw new CaixaMovimentacaoException(
+                        'Nenhum caixa aberto foi encontrado. O caixa pode ter sido fechado por outra operação.'
+                    );
+                }
+
+                return $operacao(null);
+            }
+
+            $abertura = AberturaCaixa::query()
+                ->whereKey((int) $candidata)
+                ->where('empresa_id', $empresaId)
+                ->where('usuario_id', $usuarioId)
                 ->lockForUpdate()
                 ->first();
 
-            if (!$abertura && $caixaObrigatorio) {
-                throw new CaixaMovimentacaoException(
-                    'Nenhum caixa aberto foi encontrado. O caixa pode ter sido fechado por outra operação.'
-                );
+            // Revalida depois de adquirir o lock. Se o fechamento venceu a
+            // corrida, não migra silenciosamente a operação para um caixa novo.
+            if (!$abertura || (int) $abertura->status !== 0) {
+                if ($caixaObrigatorio) {
+                    throw new CaixaMovimentacaoException(
+                        'Nenhum caixa aberto foi encontrado. O caixa pode ter sido fechado por outra operação.'
+                    );
+                }
+
+                return $operacao(null);
             }
 
             return $operacao($abertura);
