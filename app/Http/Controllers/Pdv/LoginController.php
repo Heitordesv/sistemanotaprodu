@@ -6,9 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Usuario;
 use App\Services\PdvTokenService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class LoginController extends Controller
 {
+    private const MAX_LOGIN_ATTEMPTS = 10;
+    private const LOGIN_DECAY_SECONDS = 60;
+
     public function __construct(private PdvTokenService $tokens)
     {
     }
@@ -17,8 +22,16 @@ class LoginController extends Controller
     {
         $login = trim((string) $request->login);
         $senha = (string) $request->senha;
+        $rateKey = $this->rateLimitKey($request, $login);
+
+        if (RateLimiter::tooManyAttempts($rateKey, self::MAX_LOGIN_ATTEMPTS)) {
+            return response()->json([
+                'message' => 'Muitas tentativas de login. Tente novamente em instantes.'
+            ], 429);
+        }
 
         if ($login === '' || $senha === '') {
+            RateLimiter::hit($rateKey, self::LOGIN_DECAY_SECONDS);
             return response()->json([
                 'message' => 'Login ou senha inválidos.'
             ], 401);
@@ -34,11 +47,13 @@ class LoginController extends Controller
             ($usuario->ativo !== null && (int) $usuario->ativo === 0) ||
             (int) $usuario->empresa_id <= 0
         ) {
+            RateLimiter::hit($rateKey, self::LOGIN_DECAY_SECONDS);
             return response()->json([
                 'message' => 'Login ou senha inválidos.'
             ], 401);
         }
 
+        RateLimiter::clear($rateKey);
         $token = $this->tokens->issue($usuario);
 
         return response()->json([
@@ -50,5 +65,10 @@ class LoginController extends Controller
             'img' => $usuario->img,
             'empresa_id' => (int) $usuario->empresa_id,
         ], 200);
+    }
+
+    private function rateLimitKey(Request $request, string $login): string
+    {
+        return 'pdv-login|' . $request->ip() . '|' . Str::lower($login ?: 'vazio');
     }
 }
