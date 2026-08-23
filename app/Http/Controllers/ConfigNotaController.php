@@ -160,7 +160,7 @@ class ConfigNotaController extends Controller
                 'campo_obs_nfe' => $request->campo_obs_nfe ?? '',
                 'certificado_a3' => $request->certificado_a3 ?? 0,
                 'inscricao_municipal' => $request->inscricao_municipal ?? '',
-                'token_ibpt' => $request->token_ibpt ?? '',
+                'token_ibpt' => $request->filled('token_ibpt') ? $request->token_ibpt : ($item->token_ibpt ?? ''),
                 'percentual_lucro_padrao' => $request->percentual_lucro_padrao ?? 0,
                 'validade_orcamento' => $request->validade_orcamento ?? 0,
                 'casas_decimais' => $request->casas_decimais ?? 2,
@@ -170,6 +170,8 @@ class ConfigNotaController extends Controller
                 'senha_remover' => $request->senha_remover ? md5($request->senha_remover) : ($item->senha_remover ?? ''),
                 'background_color' => $request->background_color ?? ($item->background_color ?? '#343a40'),
                 'text_color' => $request->text_color ?? ($item->text_color ?? '#ffffff'),
+                'csc' => $request->filled('csc') ? $request->csc : ($item->csc ?? ''),
+                'csc_id' => $request->csc_id ?? ($item->csc_id ?? ''),
                 'logo' => $logo,
             ];
 
@@ -288,6 +290,7 @@ class ConfigNotaController extends Controller
 
         $config->setAttribute('arquivo', null);
         $config->setAttribute('senha', null);
+        $config->setAttribute('senha_remover', null);
         $config->setAttribute('csc', null);
         $config->setAttribute('token_ibpt', null);
         $config->setAttribute('token_nfse', null);
