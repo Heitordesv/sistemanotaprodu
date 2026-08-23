@@ -128,13 +128,30 @@ class MercadoPagoGeracaoIdempotenteTest extends TestCase
             ->willReturn(['payment_id' => 'mp-safe-1', 'status' => 'pending']);
 
         $service = new ContaReceberMercadoPagoDirectChargeService($sync);
+        $provedorDisponivel = false;
 
-        Http::fake(function ($request) {
+        Http::fake(function ($request) use (&$provedorDisponivel) {
             if (str_contains($request->url(), '/v1/payments/search')) {
                 return Http::response(['results' => []], 200);
             }
 
-            return Http::response(['message' => 'temporary failure'], 500);
+            if ($request->method() === 'POST' && str_ends_with($request->url(), '/v1/payments')) {
+                if (!$provedorDisponivel) {
+                    return Http::response(['message' => 'temporary failure'], 500);
+                }
+
+                return Http::response([
+                    'id' => 'mp-safe-1',
+                    'status' => 'pending',
+                    'status_detail' => 'pending_waiting_transfer',
+                    'transaction_amount' => 45,
+                    'payment_method_id' => 'pix',
+                    'payment_type_id' => 'bank_transfer',
+                    'external_reference' => (string) $request['external_reference'],
+                ], 201);
+            }
+
+            return Http::response([], 404);
         });
 
         try {
@@ -152,25 +169,7 @@ class MercadoPagoGeracaoIdempotenteTest extends TestCase
         $this->assertNotSame('', $referenciaOriginal);
         $this->assertSame('request_failed', (string) $aposFalha->mercadopago_status);
 
-        Http::fake(function ($request) use ($referenciaOriginal) {
-            if (str_contains($request->url(), '/v1/payments/search')) {
-                return Http::response(['results' => []], 200);
-            }
-
-            if ($request->method() === 'POST' && str_ends_with($request->url(), '/v1/payments')) {
-                return Http::response([
-                    'id' => 'mp-safe-1',
-                    'status' => 'pending',
-                    'status_detail' => 'pending_waiting_transfer',
-                    'transaction_amount' => 45,
-                    'payment_method_id' => 'pix',
-                    'payment_type_id' => 'bank_transfer',
-                    'external_reference' => $referenciaOriginal,
-                ], 201);
-            }
-
-            return Http::response([], 404);
-        });
+        $provedorDisponivel = true;
 
         $resultado = $service->gerarPix($aposFalha->fresh());
         $this->assertSame('mp-safe-1', $resultado['payment_id']);
@@ -183,7 +182,7 @@ class MercadoPagoGeracaoIdempotenteTest extends TestCase
         $posts = collect(Http::recorded())
             ->filter(fn ($pair) => $pair[0]->method() === 'POST' && str_ends_with($pair[0]->url(), '/v1/payments'));
 
-        $this->assertNotEmpty($posts);
+        $this->assertGreaterThanOrEqual(2, $posts->count());
         $ultimoPost = $posts->last()[0];
         $this->assertSame($chaveOriginal, $ultimoPost->header('X-Idempotency-Key')[0] ?? null);
         $this->assertSame($referenciaOriginal, (string) $ultimoPost['external_reference']);
