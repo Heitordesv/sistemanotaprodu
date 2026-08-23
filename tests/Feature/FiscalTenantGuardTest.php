@@ -6,7 +6,12 @@ use App\Http\Controllers\API\NFCeController;
 use App\Http\Controllers\API\NFeController;
 use App\Http\Controllers\API\ProdutoController as ApiProdutoController;
 use App\Http\Controllers\AppFiscal\ConfigEmitenteController as AppConfigEmitenteController;
+use App\Http\Controllers\AppFiscal\NaturezaController as AppNaturezaController;
+use App\Http\Controllers\AppFiscal\NfceAppController;
+use App\Http\Controllers\AppFiscal\NotaFiscalAppController;
 use App\Http\Controllers\AppFiscal\ProdutoController as AppProdutoController;
+use App\Http\Controllers\AppFiscal\VendaCaixaController as AppVendaCaixaController;
+use App\Http\Controllers\AppFiscal\VendaController as AppVendaController;
 use App\Http\Controllers\ConfigNotaController;
 use App\Http\Controllers\NaturezaController;
 use App\Http\Controllers\ProductController;
@@ -92,11 +97,10 @@ class FiscalTenantGuardTest extends TestCase
     {
         $guard = new RecordingFiscalTenantGuard();
         $request = $this->requestWithAction(
-            '/api/app/produtos/94',
-            'PUT',
-            AppProdutoController::class . '@update',
-            ['empresa_id' => 999],
-            ['produto' => 94]
+            '/api/appFiscal/produtos/salvar',
+            'POST',
+            AppProdutoController::class . '@salvar',
+            ['id' => 94, 'empresa_id' => 999]
         );
 
         (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
@@ -105,13 +109,30 @@ class FiscalTenantGuardTest extends TestCase
         $this->assertContains(['produto', 20, 94], $guard->calls);
     }
 
-    public function test_appfiscal_configuracao_deriva_tenant_do_token(): void
+    public function test_appfiscal_configuracao_deriva_tenant_e_valida_natureza_padrao(): void
     {
         $guard = new RecordingFiscalTenantGuard();
         $request = $this->requestWithAction(
-            '/api/app/config/salvar',
+            '/api/appFiscal/configEmitente/salvar',
             'POST',
             AppConfigEmitenteController::class . '@salvar',
+            ['empresa_id' => 999, 'nat_op_padrao' => 95]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['app_tenant', 20], $guard->calls);
+        $this->assertContains(['natureza', 20, 95], $guard->calls);
+    }
+
+    public function test_appfiscal_natureza_index_deriva_tenant_do_token(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/naturezas',
+            'GET',
+            AppNaturezaController::class . '@index',
             ['empresa_id' => 999]
         );
 
@@ -119,6 +140,151 @@ class FiscalTenantGuardTest extends TestCase
 
         $this->assertSame(20, (int) $request->empresa_id);
         $this->assertContains(['app_tenant', 20], $guard->calls);
+    }
+
+    public function test_appfiscal_venda_find_valida_venda_antes_do_controller(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/vendas/find/101',
+            'GET',
+            AppVendaController::class . '@getVenda',
+            ['empresa_id' => 999],
+            ['id' => 101]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['venda', 20, 101], $guard->calls);
+    }
+
+    public function test_appfiscal_venda_delete_valida_venda_antes_da_mutacao(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/vendas/delete',
+            'POST',
+            AppVendaController::class . '@delete',
+            ['empresa_id' => 999, 'id' => 102]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['venda', 20, 102], $guard->calls);
+    }
+
+    public function test_appfiscal_venda_salvar_valida_natureza_e_todos_os_produtos(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/vendas/salvar',
+            'POST',
+            AppVendaController::class . '@salvar',
+            [
+                'empresa_id' => 999,
+                'natureza' => 103,
+                'itens' => [
+                    ['item_id' => 201],
+                    ['item_id' => 202],
+                ],
+            ]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['natureza', 20, 103], $guard->calls);
+        $this->assertContains(['produtos', 20, [201, 202]], $guard->calls);
+    }
+
+    public function test_appfiscal_venda_caixa_find_valida_venda_caixa_antes_do_controller(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/vendasCaixa/find/104',
+            'GET',
+            AppVendaCaixaController::class . '@getVenda',
+            ['empresa_id' => 999],
+            ['id' => 104]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['venda_caixa', 20, 104], $guard->calls);
+    }
+
+    public function test_appfiscal_venda_caixa_delete_valida_venda_caixa_antes_da_mutacao(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/vendasCaixa/delete',
+            'POST',
+            AppVendaCaixaController::class . '@delete',
+            ['empresa_id' => 999, 'id' => 105]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['venda_caixa', 20, 105], $guard->calls);
+    }
+
+    public function test_appfiscal_venda_caixa_salvar_valida_produtos_e_natureza_padrao_da_config(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/vendasCaixa/salvar',
+            'POST',
+            AppVendaCaixaController::class . '@salvar',
+            [
+                'empresa_id' => 999,
+                'itens' => [
+                    ['item_id' => 203],
+                    ['item_id' => 204],
+                ],
+            ]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['produtos', 20, [203, 204]], $guard->calls);
+        $this->assertContains(['natureza_padrao_config', 20], $guard->calls);
+    }
+
+    public function test_appfiscal_nfe_transmitir_valida_venda_do_mesmo_tenant_antes_do_emitente(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/notaFiscal/transmitir',
+            'POST',
+            NotaFiscalAppController::class . '@transmitir',
+            ['empresa_id' => 999, 'venda_id' => 106]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['venda', 20, 106], $guard->calls);
+    }
+
+    public function test_appfiscal_nfce_transmitir_valida_venda_caixa_do_mesmo_tenant_antes_do_emitente(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/appFiscal/nfce/transmitir',
+            'POST',
+            NfceAppController::class . '@transmitir',
+            ['empresa_id' => 999, 'venda_id' => 107]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(20, (int) $request->empresa_id);
+        $this->assertContains(['venda_caixa', 20, 107], $guard->calls);
     }
 
     public function test_web_produto_usa_tenant_da_sessao_e_valida_id_da_rota(): void
@@ -229,6 +395,24 @@ class FiscalTenantGuardTest extends TestCase
         $this->assertStringContainsString('->firstOrFail()', $guardSource);
     }
 
+    public function test_config_emitente_appfiscal_cria_confignota_com_empresa_do_contexto(): void
+    {
+        $source = (string) file_get_contents(app_path('Http/Controllers/AppFiscal/ConfigEmitenteController.php'));
+
+        $this->assertStringContainsString("'empresa_id' => \$request->empresa_id", $source);
+    }
+
+    public function test_appfiscal_fiscal_controllers_estao_dentro_do_boundary_central(): void
+    {
+        $source = (string) file_get_contents(app_path('Http/Middleware/ResolveFiscalApiTenantContext.php'));
+
+        $this->assertStringContainsString('AppNaturezaController::class', $source);
+        $this->assertStringContainsString('AppVendaController::class', $source);
+        $this->assertStringContainsString('AppVendaCaixaController::class', $source);
+        $this->assertStringContainsString('NotaFiscalAppController::class', $source);
+        $this->assertStringContainsString('NfceAppController::class', $source);
+    }
+
     private function requestWithAction(
         string $uri,
         string $method,
@@ -317,9 +501,20 @@ class RecordingFiscalTenantGuard extends FiscalTenantGuardService
         return new Produto();
     }
 
+    public function produtos(int $empresaId, array $ids): void
+    {
+        $this->calls[] = ['produtos', $empresaId, array_values($ids)];
+    }
+
     public function configNota(int $empresaId, int $id): ConfigNota
     {
         $this->calls[] = ['config_nota', $empresaId, $id];
         return new ConfigNota();
+    }
+
+    public function naturezaPadraoDaConfig(int $empresaId): ?NaturezaOperacao
+    {
+        $this->calls[] = ['natureza_padrao_config', $empresaId];
+        return new NaturezaOperacao();
     }
 }
