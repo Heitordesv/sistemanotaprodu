@@ -11,6 +11,7 @@ use App\Services\CaixaResumoService;
 use Dompdf\Dompdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AberturaCaixaController extends Controller
 {
@@ -34,8 +35,49 @@ class AberturaCaixaController extends Controller
         $usuarioId = (int) get_id_user();
         $empresaId = (int) $this->empresa_id;
 
+        $filialInformada = $request->input('filial_id');
+        if ($filialInformada === null || $filialInformada === '' || (string) $filialInformada === '-1') {
+            $request->merge(['filial_id' => null]);
+        }
+
+        $validated = $request->validate([
+            'valor' => [
+                'required',
+                function ($attribute, $value, $fail) {
+                    $valor = trim((string) $value);
+                    $formatoValido = preg_match(
+                        '/^(?:(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{1,2})?|\d+(?:\.\d{1,2})?)$/',
+                        $valor
+                    );
+
+                    if (!$formatoValido) {
+                        $fail('O valor de abertura deve ser um valor monetário válido e maior ou igual a zero.');
+                        return;
+                    }
+
+                    $normalizado = __convert_value_bd($valor);
+                    if (!is_numeric($normalizado) || !is_finite((float) $normalizado) || (float) $normalizado < 0) {
+                        $fail('O valor de abertura deve ser um valor monetário válido e maior ou igual a zero.');
+                    }
+                },
+            ],
+            'filial_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('filials', 'id')->where(function ($query) use ($empresaId) {
+                    return $query->where('empresa_id', $empresaId);
+                }),
+            ],
+        ], [
+            'filial_id.integer' => 'A filial informada é inválida.',
+            'filial_id.exists' => 'A filial informada não pertence à empresa atual.',
+        ]);
+
+        $valorAbertura = round((float) __convert_value_bd($validated['valor']), 2);
+        $filialId = isset($validated['filial_id']) ? (int) $validated['filial_id'] : null;
+
         try {
-            $abertura = DB::transaction(function () use ($request, $usuarioId, $empresaId) {
+            $abertura = DB::transaction(function () use ($usuarioId, $empresaId, $valorAbertura, $filialId) {
                 Usuario::query()
                     ->where('id', $usuarioId)
                     ->where('empresa_id', $empresaId)
@@ -66,14 +108,12 @@ class AberturaCaixaController extends Controller
 
                 return AberturaCaixa::create([
                     'usuario_id' => $usuarioId,
-                    'valor' => __convert_value_bd($request->valor),
+                    'valor' => $valorAbertura,
                     'empresa_id' => $empresaId,
                     'primeira_venda_nfe' => $ultimaVendaNfeId,
                     'primeira_venda_nfce' => $ultimaVendaNfceId,
                     'status' => 0,
-                    'filial_id' => (int) $request->filial_id === -1
-                        ? null
-                        : ($request->filial_id ?: null),
+                    'filial_id' => $filialId,
                 ]);
             });
 
@@ -81,7 +121,7 @@ class AberturaCaixaController extends Controller
         } catch (\DomainException $e) {
             session()->flash('flash_warning', $e->getMessage());
         } catch (\Exception $e) {
-            session()->flash('flash_erro', 'Erro ao abrir o caixa: ' . $e->getMessage());
+            session()->flash('flash_erro', 'Não foi possível abrir o caixa. Tente novamente.');
             __saveLogError($e, $empresaId);
         }
 
