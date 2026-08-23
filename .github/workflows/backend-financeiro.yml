@@ -76,6 +76,7 @@ jobs:
           vendor/bin/phpunit tests/Feature/CaixaRecebimentosTest.php
           vendor/bin/phpunit tests/Feature/CaixaVinculoAberturaTest.php
           vendor/bin/phpunit tests/Feature/VendaTenantIsolationTest.php
+          vendor/bin/phpunit tests/Feature/VendaCaixaImutabilidadeTest.php
           vendor/bin/phpunit tests/Feature/CaixaMovimentacaoRoutesTest.php
           vendor/bin/phpunit tests/Feature/ContaReceberPagamentoConcorrenciaTest.php
           vendor/bin/phpunit tests/Feature/ContaReceberPagamentoIdempotenciaTest.php
@@ -84,4 +85,5 @@ jobs:
         run: |
           vendor/bin/phpunit tests/Integration/ContaReceberMysqlConcurrencyTest.php
           vendor/bin/phpunit tests/Integration/CaixaMovimentacaoMysqlConcurrencyTest.php
+          vendor/bin/phpunit tests/Integration/VendaCaixaEdicaoMysqlConcurrencyTest.php
           vendor/bin/phpunit tests/Integration/FinanceiroMigrationMysqlTest.php
