@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ConfigEcommerce;
 use App\Models\ContaReceber;
+use App\Services\ContaReceberMercadoPagoDirectChargeService;
 use App\Services\ContaReceberMercadoPagoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -11,18 +12,20 @@ use RuntimeException;
 
 class ContaReceberMercadoPagoController extends Controller
 {
-    public function __construct(private ContaReceberMercadoPagoService $service)
-    {
+    public function __construct(
+        private ContaReceberMercadoPagoService $service,
+        private ContaReceberMercadoPagoDirectChargeService $directChargeService
+    ) {
     }
 
     public function pix(int $id)
     {
-        return $this->executarAdmin($id, fn ($conta) => $this->service->gerarPix($conta));
+        return $this->executarAdmin($id, fn ($conta) => $this->directChargeService->gerarPix($conta));
     }
 
     public function boleto(int $id)
     {
-        return $this->executarAdmin($id, fn ($conta) => $this->service->gerarBoleto($conta));
+        return $this->executarAdmin($id, fn ($conta) => $this->directChargeService->gerarBoleto($conta));
     }
 
     public function cartao(int $id)
@@ -85,13 +88,14 @@ class ContaReceberMercadoPagoController extends Controller
                 'message' => $e->getMessage(),
             ]);
 
-            // Se a assinatura for inválida, retorna 401. Nos demais erros, 200 evita loop
-            // de reentregas enquanto o detalhe fica registrado em log para correção.
             if ($e instanceof RuntimeException && str_contains($e->getMessage(), 'assinatura')) {
                 return response()->json(['ok' => false], 401);
             }
 
-            return response()->json(['ok' => true], 200);
+            // Não confirma um evento financeiro que não foi persistido. O 503
+            // permite que o provedor reentregue a notificação depois de uma falha
+            // temporária de banco, rede ou API.
+            return response()->json(['ok' => false], 503);
         }
     }
 
