@@ -114,6 +114,19 @@ class RouteServiceProvider extends ServiceProvider
             |
             */
             $this->loadWebRoutes('routes/operacional_security.php');
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Devolução segura do PDV
+            |--------------------------------------------------------------------------
+            |
+            | Carregado por último para substituir apenas as rotas legadas de
+            | devolução e cancelamento NFC-e. O arquivo usa o grupo web, portanto
+            | o cancelamento fiscal passa a ter sessão e CSRF sem mudar a URL JS.
+            |
+            */
+            $this->loadWebRoutes('routes/pdv_devolucao_segura.php');
         });
     }
 
