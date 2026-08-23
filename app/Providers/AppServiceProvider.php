@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use App\Models\ConfigNota;
+use App\Models\ContaReceber;
 use App\Models\Usuario;
 use App\Models\VideoAjuda;
+use App\Observers\ContaReceberMercadoPagoObserver;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 
@@ -20,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot()
     {
+        ContaReceber::observe(ContaReceberMercadoPagoObserver::class);
+
         Paginator::useBootstrap();
 
         view()->composer('*', function ($view) {
