@@ -146,14 +146,9 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
             'vPag' => '40.00',
         ]);
 
-        // Em produção o suplemento é preenchido após a assinatura. Neste teste
-        // sem certificado ele é informado para validar o XML completo da NFC-e.
-        $make->taginfNFeSupl((object) [
-            'qrcode' => 'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx?p=43211105730928000145650010000002401717268120|2|2',
-            'urlChave' => 'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx',
-        ]);
-
-        $xml = $make->getXML();
+        $xml = $this->adicionarSuplementoNfceSemAssinatura(
+            $make->getXML()
+        );
         $schema = $this->schemaNFe400();
 
         $this->assertTrue(Validator::isValid($xml, $schema));
@@ -185,6 +180,30 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
             $vNF,
             round($vProd + $vFrete + $vOutro - $vDesc, 2)
         );
+    }
+
+    private function adicionarSuplementoNfceSemAssinatura(
+        string $xml
+    ): string {
+        $dom = new DOMDocument();
+        $dom->loadXML($xml);
+
+        $namespace = 'http://www.portalfiscal.inf.br/nfe';
+        $suplemento = $dom->createElementNS($namespace, 'infNFeSupl');
+        $qrCode = $dom->createElementNS($namespace, 'qrCode');
+        $qrCode->appendChild($dom->createCDATASection(
+            'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx?p=43211105730928000145650010000002401717268120|2|2'
+        ));
+        $suplemento->appendChild($qrCode);
+        $suplemento->appendChild($dom->createElementNS(
+            $namespace,
+            'urlChave',
+            'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx'
+        ));
+
+        $dom->documentElement->appendChild($suplemento);
+
+        return $dom->saveXML();
     }
 
     private function schemaNFe400(): string
