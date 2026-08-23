@@ -82,6 +82,27 @@ class VendaCaixaImutabilidadeTest extends TestCase
         $this->assertSame(25.0, (float) DB::table('vendas')->where('id', 21)->value('valor_total'));
     }
 
+    public function test_edicao_nao_pode_trocar_operador_historico_da_venda_vinculada(): void
+    {
+        $this->criarAbertura(103, 0, 30, 30);
+        $this->criarVenda(31, 103, 10.00);
+
+        try {
+            app(VendaCaixaEdicaoService::class)->executar(31, 1, function (Venda $venda) {
+                $venda->usuario_id = 8;
+                $venda->valor_total = 50;
+                $venda->save();
+            });
+            $this->fail('A edição não pode trocar o operador histórico da venda vinculada ao caixa.');
+        } catch (CaixaMovimentacaoException $e) {
+            $this->assertStringContainsString('operador histórico', $e->getMessage());
+        }
+
+        $venda = DB::table('vendas')->where('id', 31)->first();
+        $this->assertSame(7, (int) $venda->usuario_id);
+        $this->assertSame(10.0, (float) $venda->valor_total);
+    }
+
     public function test_venda_realmente_fora_de_caixa_continua_editavel(): void
     {
         $this->criarVenda(30, null, 12.00);
