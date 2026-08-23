@@ -92,11 +92,19 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
         $controller = new ContaReceberMercadoPagoController($service);
         $response = $controller->status(10);
         $conteudo = (string) $response->getContent();
+        $payload = json_decode($conteudo, true);
 
         $this->assertSame(422, $response->getStatusCode());
         $this->assertStringNotContainsString('Access token', $conteudo);
         $this->assertStringNotContainsString('SQLSTATE', $conteudo);
-        $this->assertStringContainsString('Não foi possível processar', $conteudo);
+        $this->assertSame(
+            'Não foi possível processar a operação do Mercado Pago.',
+            $payload['message'] ?? null
+        );
+        $this->assertSame(
+            'Não foi possível processar a operação do Mercado Pago.',
+            $payload['erro'] ?? null
+        );
         $this->assertTrue(session()->has('user_logged'));
     }
 }
