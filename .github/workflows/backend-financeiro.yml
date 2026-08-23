@@ -78,6 +78,7 @@ jobs:
           vendor/bin/phpunit tests/Feature/VendaTenantIsolationTest.php
           vendor/bin/phpunit tests/Feature/VendaCaixaImutabilidadeTest.php
           vendor/bin/phpunit tests/Feature/CaixaMovimentacaoRoutesTest.php
+          vendor/bin/phpunit tests/Feature/SangriaDinheiroGavetaTest.php
           vendor/bin/phpunit tests/Feature/ContaReceberPagamentoConcorrenciaTest.php
           vendor/bin/phpunit tests/Feature/ContaReceberPagamentoIdempotenciaTest.php
 
