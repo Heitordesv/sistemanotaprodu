@@ -531,7 +531,9 @@ $("#inp-produto_id").select2({
 
     ajax: {
         cache: true,
-        url: path_url + "api/produtos/pesquisa",
+        url: window.pdvProdutoEndpoints
+            ? window.pdvProdutoEndpoints.pesquisa
+            : path_url + "api/produtos/pesquisa",
         dataType: "json",
         data: function (params) {
             // console.clear();
@@ -575,7 +577,9 @@ $(".produto_id").select2({
     theme: "bootstrap4",
     ajax: {
         cache: true,
-        url: path_url + "api/produtos/pesquisa",
+        url: window.pdvProdutoEndpoints
+            ? window.pdvProdutoEndpoints.pesquisa
+            : path_url + "api/produtos/pesquisa",
         dataType: "json",
         data: function (params) {
             // console.clear();
