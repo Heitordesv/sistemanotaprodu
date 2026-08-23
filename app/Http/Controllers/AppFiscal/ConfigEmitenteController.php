@@ -37,6 +37,7 @@ class ConfigEmitenteController extends Controller
             //create
 
             $data = [
+                'empresa_id' => $request->empresa_id,
                 'razao_social' => $request->razao_social,
                 'nome_fantasia' => $request->nome_fantasia,
                 'cnpj' => $request->cnpj,
