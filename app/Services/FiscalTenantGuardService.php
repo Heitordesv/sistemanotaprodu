@@ -50,8 +50,13 @@ class FiscalTenantGuardService
         $token = (string) $request->header('token');
         $decoded = base64_decode($token, true);
         $parts = $decoded === false ? [] : explode(';', $decoded);
+        $appKey = (string) env('KEY_APP');
 
-        if (count($parts) < 3 || !hash_equals((string) env('KEY_APP'), (string) $parts[2])) {
+        if (
+            $appKey === '' ||
+            count($parts) < 3 ||
+            !hash_equals($appKey, (string) $parts[2])
+        ) {
             throw new AccessDeniedHttpException('Credencial inválida.');
         }
 
