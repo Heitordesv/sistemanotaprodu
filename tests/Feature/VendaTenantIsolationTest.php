@@ -78,6 +78,24 @@ class VendaTenantIsolationTest extends TestCase
         app(VendaTenantGuardService::class)->validar($request, 50);
     }
 
+    public function test_update_nao_permite_trocar_abertura_caixa_id(): void
+    {
+        DB::table('vendas')->insert([
+            'id' => 60,
+            'empresa_id' => 1,
+            'abertura_caixa_id' => 77,
+        ]);
+
+        $request = $this->requestValido([
+            'abertura_caixa_id' => 999,
+        ]);
+
+        $venda = app(VendaTenantGuardService::class)->prepararUpdate($request, 60);
+
+        $this->assertSame(77, (int) $venda->abertura_caixa_id);
+        $this->assertNull($request->input('abertura_caixa_id'));
+    }
+
     public function test_natureza_de_outro_tenant_e_rejeitada(): void
     {
         $request = $this->requestValido([
@@ -162,10 +180,13 @@ class VendaTenantIsolationTest extends TestCase
     public function test_rotas_criticas_apontam_para_controllers_endurecidos(): void
     {
         $updateRoute = app('router')->getRoutes()->match(Request::create('/vendas/50', 'PUT'));
-        $pdvRoute = app('router')->getRoutes()->match(Request::create('/frenteCaixa', 'GET'));
+        $pdvIndexRoute = app('router')->getRoutes()->match(Request::create('/frenteCaixa', 'GET'));
+        $pdvStoreRoute = app('router')->getRoutes()->match(Request::create('/frenteCaixa', 'POST'));
 
         $this->assertStringContainsString(VendaSeguraController::class, $updateRoute->getActionName());
-        $this->assertStringContainsString(FrontBoxResumoController::class, $pdvRoute->getActionName());
+        $this->assertStringContainsString(FrontBoxResumoController::class, $pdvIndexRoute->getActionName());
+        $this->assertStringContainsString(FrontBoxResumoController::class, $pdvStoreRoute->getActionName());
+        $this->assertContains('caixaMovimento:obrigatorio', $pdvStoreRoute->gatherMiddleware());
     }
 
     private function requestValido(array $override = []): Request
