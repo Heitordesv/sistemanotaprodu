@@ -20,6 +20,8 @@ class FiscalSecretsSecurityTest extends TestCase
 
         $this->certificadosTable = (new Certificado())->getTable();
         Schema::dropIfExists($this->certificadosTable);
+        $this->removeTestPrivateDirectory(10);
+        $this->removeTestPrivateDirectory(20);
 
         Schema::create($this->certificadosTable, function (Blueprint $table) {
             $table->bigIncrements('id');
@@ -40,6 +42,8 @@ class FiscalSecretsSecurityTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->removeTestPrivateDirectory(10);
+        $this->removeTestPrivateDirectory(20);
         Schema::dropIfExists($this->certificadosTable);
         parent::tearDown();
     }
@@ -72,6 +76,22 @@ class FiscalSecretsSecurityTest extends TestCase
 
         $this->assertSame(0, Certificado::where('empresa_id', 10)->count());
         $this->assertSame(1, Certificado::where('empresa_id', 20)->count());
+    }
+
+    public function test_excluir_certificado_remove_apenas_copia_privada_do_mesmo_tenant(): void
+    {
+        $directoryA = storage_path('app/private/certificados/10');
+        $directoryB = storage_path('app/private/certificados/20');
+        mkdir($directoryA, 0700, true);
+        mkdir($directoryB, 0700, true);
+        file_put_contents($directoryA . '/a.pfx', 'certificado-a');
+        file_put_contents($directoryB . '/b.pfx', 'certificado-b');
+
+        (new FiscalCertificateService())->deleteForEmpresa(10);
+
+        $this->assertDirectoryDoesNotExist($directoryA);
+        $this->assertDirectoryExists($directoryB);
+        $this->assertFileExists($directoryB . '/b.pfx');
     }
 
     public function test_certificado_nao_serializa_senha_nem_arquivo(): void
@@ -122,6 +142,7 @@ class FiscalSecretsSecurityTest extends TestCase
         $this->assertStringNotContainsString('Certificado::first', $source);
         $this->assertStringContainsString('FiscalCertificateService', $source);
         $this->assertStringContainsString('(int) $request->empresa_id', $source);
+        $this->assertStringContainsString("'empresa_id' => $request->empresa_id", $source);
     }
 
     public function test_pdv_nao_retorna_csc_ou_senha_do_certificado(): void
@@ -141,5 +162,28 @@ class FiscalSecretsSecurityTest extends TestCase
         $this->assertStringNotContainsString("public_path('certificados')", $source);
         $this->assertStringContainsString("storage_path('app/private/certificados/'", $source);
         $this->assertStringContainsString("->where('empresa_id', request()->empresa_id)", $source);
+        $this->assertStringContainsString("$request->csc !== '********'", $source);
+    }
+
+    private function removeTestPrivateDirectory(int $empresaId): void
+    {
+        $directory = storage_path('app/private/certificados/' . $empresaId);
+
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        foreach ((array) scandir($directory) as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
+            $path = $directory . DIRECTORY_SEPARATOR . $file;
+            if (is_file($path) || is_link($path)) {
+                @unlink($path);
+            }
+        }
+
+        @rmdir($directory);
     }
 }
