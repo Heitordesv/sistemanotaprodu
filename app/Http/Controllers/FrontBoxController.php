@@ -36,6 +36,7 @@ use App\Models\VendaCaixa;
 use App\Models\VendaCaixaPreVenda;
 use App\Services\AutorizacaoDevolucaoService;
 use App\Services\DevolucaoEstoqueService;
+use App\Services\FiscalTenantGuardService;
 use App\Services\PdvReceiptPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +75,41 @@ class FrontBoxController extends Controller
     {   
         $view = $this->pdvAssincrono($request->prevenda_id);
         return $view;
+    }
+
+    /**
+     * As consultas de produto feitas pela tela web do PDV usam a empresa da
+     * sessão, resolvida pelo ResolveCashTenantContext. O controller da API é
+     * reutilizado apenas para manter o mesmo formato de resposta das telas
+     * legadas; empresa_id recebido do navegador nunca é a fonte de identidade.
+     */
+    public function produtosPesquisa(Request $request)
+    {
+        return app(\App\Http\Controllers\API\ProdutoController::class)
+            ->pesquisa($request);
+    }
+
+    public function produtosFind(Request $request, $id)
+    {
+        app(FiscalTenantGuardService::class)->produto(
+            (int) $request->empresa_id,
+            (int) $id
+        );
+
+        return app(\App\Http\Controllers\API\ProdutoController::class)
+            ->find($id);
+    }
+
+    public function produtosFindByBarcode(Request $request)
+    {
+        return app(\App\Http\Controllers\API\ProdutoController::class)
+            ->findByBarcode($request);
+    }
+
+    public function produtosFindByBarcodeReference(Request $request)
+    {
+        return app(\App\Http\Controllers\API\ProdutoController::class)
+            ->findByBarcodeReference($request);
     }
 
     private function validaCaixaAberto($funcionarios)

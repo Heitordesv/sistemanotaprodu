@@ -144,7 +144,11 @@ $(function () {
 
         if (product_id) {
 
-            $.get(path_url + "api/produtos/find/" + product_id)
+            let produtoFindUrl = window.pdvProdutoEndpoints
+                ? window.pdvProdutoEndpoints.find
+                : path_url + "api/produtos/find";
+
+            $.get(produtoFindUrl + "/" + product_id)
             .done((e) => {
 
                 $("#inp-quantidade").val("1,00");
@@ -1079,7 +1083,11 @@ function processarCodigoBarras(codigo) {
     leituraCodigoEmAndamento = true;
     $('#codBarras').val('');
 
-    $.get(path_url + 'api/produtos/findByBarcode', {
+    var findByBarcodeUrl = window.pdvProdutoEndpoints
+        ? window.pdvProdutoEndpoints.findByBarcode
+        : path_url + 'api/produtos/findByBarcode';
+
+    $.get(findByBarcodeUrl, {
         barcode: codigo,
         empresa_id: $('#empresa_id').val()
     })
@@ -1120,7 +1128,11 @@ $('#codBarras')
     });
 
 function buscarPorReferencia(barcode) {
-    $.get(path_url + 'api/produtos/findByBarcodeReference', {
+    var findByBarcodeReferenceUrl = window.pdvProdutoEndpoints
+        ? window.pdvProdutoEndpoints.findByBarcodeReference
+        : path_url + 'api/produtos/findByBarcodeReference';
+
+    $.get(findByBarcodeReferenceUrl, {
         barcode: barcode,
         empresa_id: $('#empresa_id').val(),
         usuario_id: $('#usuario_id').val()
