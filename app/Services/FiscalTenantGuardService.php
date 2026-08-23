@@ -15,6 +15,8 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class FiscalTenantGuardService
 {
+    public const VERIFIED_TENANT_ATTRIBUTE = 'fiscal_tenant_empresa_id';
+
     /**
      * Resolve o tenant de chamadas fiscais web/API pelo hash já atribuído à empresa.
      * O empresa_id enviado pelo cliente nunca é considerado fonte de identidade.
@@ -35,9 +37,11 @@ class FiscalTenantGuardService
             throw new AccessDeniedHttpException('Empresa não identificada.');
         }
 
-        $request->merge(['empresa_id' => (int) $empresaId]);
+        $empresaId = (int) $empresaId;
+        $request->merge(['empresa_id' => $empresaId]);
+        $request->attributes->set(self::VERIFIED_TENANT_ATTRIBUTE, $empresaId);
 
-        return (int) $empresaId;
+        return $empresaId;
     }
 
     /**
@@ -69,9 +73,11 @@ class FiscalTenantGuardService
             throw new AccessDeniedHttpException('Credencial inválida.');
         }
 
-        $request->merge(['empresa_id' => (int) $usuario->empresa_id]);
+        $empresaId = (int) $usuario->empresa_id;
+        $request->merge(['empresa_id' => $empresaId]);
+        $request->attributes->set(self::VERIFIED_TENANT_ATTRIBUTE, $empresaId);
 
-        return (int) $usuario->empresa_id;
+        return $empresaId;
     }
 
     public function empresaIdDaSessao(Request $request): int
@@ -87,6 +93,7 @@ class FiscalTenantGuardService
         }
 
         $request->merge(['empresa_id' => $empresaId]);
+        $request->attributes->set(self::VERIFIED_TENANT_ATTRIBUTE, $empresaId);
 
         return $empresaId;
     }
