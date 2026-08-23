@@ -1664,6 +1664,10 @@ Route::get('/storeApontamentomanual', 'StockController@storeApontamentomanual')
 
     Route::group(['prefix' => 'frenteCaixa'], function () {
         Route::get('/list', 'FrontBoxController@list')->name('frenteCaixa.list');
+        Route::get('/produtos/pesquisa', 'FrontBoxController@produtosPesquisa')->name('frenteCaixa.produtos.pesquisa');
+        Route::get('/produtos/find/{id}', 'FrontBoxController@produtosFind')->name('frenteCaixa.produtos.find');
+        Route::get('/produtos/findByBarcode', 'FrontBoxController@produtosFindByBarcode')->name('frenteCaixa.produtos.findByBarcode');
+        Route::get('/produtos/findByBarcodeReference', 'FrontBoxController@produtosFindByBarcodeReference')->name('frenteCaixa.produtos.findByBarcodeReference');
         Route::get('/imprimir-nao-fiscal/{id}', 'FrontBoxController@imprimirNaoFiscal')->name('frenteCaixa.imprimir-nao-fiscal');
         Route::get('/devolucao', 'FrontBoxController@devolucao')->name('frenteCaixa.devolucao');
         Route::get('/troca', 'FrontBoxController@troca')->name('frenteCaixa.troca');
