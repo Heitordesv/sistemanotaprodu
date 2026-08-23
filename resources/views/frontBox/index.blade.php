@@ -846,6 +846,17 @@
     </script>
 
     <script src="{{ asset('assets/js/jquery.min.js') }}"></script>
+    <script>
+        const pdvEmpresaHash = @json(data_get(session('user_logged'), 'hash_empresa'));
+
+        if (pdvEmpresaHash) {
+            $.ajaxSetup({
+                headers: {
+                    'X-Empresa-Hash': pdvEmpresaHash
+                }
+            });
+        }
+    </script>
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.js"></script>
     <script src="{{ asset('js/jquery.mask.min.js') }}"></script>
