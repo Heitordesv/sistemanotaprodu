@@ -20,13 +20,13 @@ class NFCeItemAdjustmentRateioServiceTest extends TestCase
     {
         $itens = $this->service->ratear([50, 50], 90, 0, 20);
 
-        $this->assertSame(45.0, $itens[0]['desconto']);
-        $this->assertSame(45.0, $itens[1]['desconto']);
-        $this->assertSame(10.0, $itens[0]['frete']);
-        $this->assertSame(10.0, $itens[1]['frete']);
+        $this->assertEquals(45.0, $itens[0]['desconto']);
+        $this->assertEquals(45.0, $itens[1]['desconto']);
+        $this->assertEquals(10.0, $itens[0]['frete']);
+        $this->assertEquals(10.0, $itens[1]['frete']);
         $this->assertSame(90.0, $this->soma($itens, 'desconto'));
         $this->assertSame(20.0, $this->soma($itens, 'frete'));
-        $this->assertSame(30.0, 100 + 20 - 90);
+        $this->assertSame(30.0, 100.0 + 20.0 - 90.0);
     }
 
     public function test_rateia_frete_desconto_e_acrescimo_com_ajuste_de_centavos(): void
