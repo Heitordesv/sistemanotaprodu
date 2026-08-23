@@ -18,11 +18,6 @@ class PdvDevolucaoFinanceiroService
 {
     private const STATUS_CANCELADO_POR_DEVOLUCAO = 2;
 
-    public function __construct(
-        private MovimentacaoFinanceiraCaixaService $movimentacaoCaixa
-    ) {
-    }
-
     public function validarPreCondicoes(VendaCaixa $venda, Usuario $operador): array
     {
         $snapshot = $this->snapshot($venda, false);
@@ -264,7 +259,10 @@ class PdvDevolucaoFinanceiroService
             ];
         }
 
-        $usuarioCaixaId = $this->movimentacaoCaixa->usuarioCaixaId((int) $operador->id);
+        // A autorização devolve como solicitante o usuário logado que executa a
+        // devolução. É exatamente o mesmo usuário usado pelo middleware de caixa
+        // para localizar a AberturaCaixa; não existe uma segunda tradução de ID.
+        $usuarioCaixaId = (int) $operador->id;
 
         if ($original && (int) $original->status === 0) {
             if ((int) $original->usuario_id !== $usuarioCaixaId) {
