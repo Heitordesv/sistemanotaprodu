@@ -1,0 +1,75 @@
+name: Backend Financeiro
+
+on:
+  push:
+    branches:
+      - agent/backend-senior
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  financeiro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: sistemanota_test
+          MYSQL_USER: sistemanota
+          MYSQL_PASSWORD: sistemanota
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_URL: http://localhost
+      CACHE_DRIVER: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: sistemanota_test
+      DB_USERNAME: sistemanota
+      DB_PASSWORD: sistemanota
+      RUN_MYSQL_CONCURRENCY_TESTS: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, gd, pdo_mysql, sqlite3, pcntl, xml, curl, zip
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Clear Laravel config
+        run: php artisan config:clear
+
+      - name: Feature tests do fluxo financeiro
+        run: >-
+          vendor/bin/phpunit
+          tests/Feature/CaixaRecebimentosTest.php
+          tests/Feature/ContaReceberPagamentoConcorrenciaTest.php
+
+      - name: MySQL InnoDB concurrency and migration tests
+        run: >-
+          vendor/bin/phpunit
+          tests/Integration/ContaReceberMysqlConcurrencyTest.php
+          tests/Integration/FinanceiroMigrationMysqlTest.php
