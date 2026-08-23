@@ -73,7 +73,9 @@ jobs:
         run: php artisan config:clear
 
       - name: Fiscal tenant isolation tests
-        run: vendor/bin/phpunit tests/Feature/FiscalTenantGuardTest.php
+        run: |
+          vendor/bin/phpunit tests/Feature/FiscalTenantGuardTest.php
+          vendor/bin/phpunit tests/Feature/FiscalTenantGuardDatabaseTest.php
 
       - name: Feature tests do fluxo financeiro
         run: |
