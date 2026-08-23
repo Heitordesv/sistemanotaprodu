@@ -197,6 +197,11 @@ public function gerarNFCe($venda){
 		$somaDesconto = 0;
 		$totalItens = count($venda->itens);
 		$somaAcrescimo = 0;
+		$somaFrete = 0;
+		$taxaEntrega = (float) ($venda->taxa_entrega ?? 0);
+		$subtotalProdutos = (float) $venda->itens->sum(function ($item) {
+			return $item->quantidade * $item->valor;
+		});
 		$VBC = 0;
 
 		$somaFederal = 0;
@@ -260,6 +265,22 @@ public function gerarNFCe($venda){
 			}
 			$stdProd->vUnTrib = $this->format($i->valor, $config->casas_decimais);
 			$stdProd->indTot = 1;
+
+			if($taxaEntrega > 0 && $subtotalProdutos > 0){
+				if($itemCont < $totalItens){
+					$freteItem = round(
+						$taxaEntrega * (($i->quantidade * $i->valor) / $subtotalProdutos),
+						2
+					);
+					$somaFrete += $freteItem;
+				}else{
+					$freteItem = round($taxaEntrega - $somaFrete, 2);
+				}
+
+				if($freteItem > 0){
+					$stdProd->vFrete = $this->format($freteItem);
+				}
+			}
 
 			//calculo media prod
 			if($venda->acrescimo > 0){
@@ -460,7 +481,7 @@ public function gerarNFCe($venda){
 		$stdICMSTot->vBCST = 0.00;
 		$stdICMSTot->vST = 0.00;
 		$stdICMSTot->vProd = $this->format($somaProdutos);
-		$stdICMSTot->vFrete = 0.00;
+		$stdICMSTot->vFrete = $this->format($taxaEntrega);
 		$stdICMSTot->vSeg = 0.00;
 		$stdICMSTot->vDesc = $this->format($venda->desconto);
 		$stdICMSTot->vII = 0.00;

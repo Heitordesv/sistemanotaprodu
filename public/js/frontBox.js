@@ -1,7 +1,12 @@
 var TOTAL = 0;
 var caixaAberto = false;
 var DESCONTO = 0;
+var DESCONTO_TIPO = 'fixo';
+var DESCONTO_VALOR_INFORMADO = 0;
 var VALORACRESCIMO = 0;
+var ACRESCIMO_TIPO = 'fixo';
+var ACRESCIMO_VALOR_INFORMADO = 0;
+var TAXA_ENTREGA = 0;
 var ITENS = [];
 var SENHADESBLOQUEADA = false;
 var PERCENTUALMAXDESCONTO = false;
@@ -609,7 +614,7 @@ function validaPass(call) {
 var total_payment = 0;
 
 function totalLiquidoPdv() {
-    return Math.max(0, Number(total_venda || 0) + Number(VALORACRESCIMO || 0) - Number(DESCONTO || 0));
+    return Math.max(0, Number(total_venda || 0) + Number(TAXA_ENTREGA || 0) + Number(VALORACRESCIMO || 0) - Number(DESCONTO || 0));
 }
 
 function totalLinhasPagamento() {
@@ -970,8 +975,13 @@ $('#form-pdv').on('submit', function (e) {
     var json = $(this).serializeFormJSON();
     json.empresa_id = $('#empresa_id').val();
     json.usuario_id = $('#usuario_id').val();
-    json.desconto = convertMoedaToFloat($('#valor_desconto').text());
-    json.acrescimo = convertMoedaToFloat($('#valor_acrescimo').text());
+    json.desconto = DESCONTO;
+    json.desconto_tipo = DESCONTO_TIPO;
+    json.desconto_valor = DESCONTO_VALOR_INFORMADO;
+    json.acrescimo = VALORACRESCIMO;
+    json.acrescimo_tipo = ACRESCIMO_TIPO;
+    json.acrescimo_valor = ACRESCIMO_VALOR_INFORMADO;
+    json.taxa_entrega = TAXA_ENTREGA;
 
     window.__pdvSubmissionInProgress = true;
     $('#salvar_venda').attr('disabled', true);
