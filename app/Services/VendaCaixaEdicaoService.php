@@ -68,7 +68,20 @@ class VendaCaixaEdicaoService
                     );
                 }
 
-                return $operacao($venda, $abertura);
+                $resultado = $operacao($venda, $abertura);
+
+                // VendaController legado sobrescreve usuario_id com o usuário
+                // que está editando. Isso não pode fazer uma venda sumir do
+                // resumo do operador original. Revalidamos antes do commit e,
+                // se qualquer vínculo financeiro mudou, toda a edição volta.
+                $this->validarInvariantesDepoisDaOperacao(
+                    $vendaId,
+                    $empresaId,
+                    $abertura,
+                    $vinculoLegado
+                );
+
+                return $resultado;
             }
 
             // Venda realmente fora de caixa: ainda bloqueamos a própria linha
@@ -85,7 +98,20 @@ class VendaCaixaEdicaoService
                 );
             }
 
-            return $operacao($venda, null);
+            $resultado = $operacao($venda, null);
+
+            $vendaAtual = Venda::query()
+                ->whereKey($vendaId)
+                ->where('empresa_id', $empresaId)
+                ->first();
+
+            if ($vendaAtual && (int) ($vendaAtual->abertura_caixa_id ?? 0) > 0) {
+                throw new CaixaMovimentacaoException(
+                    'Uma venda fora de caixa não pode receber vínculo de caixa durante a edição.'
+                );
+            }
+
+            return $resultado;
         }, 3);
     }
 
@@ -161,6 +187,47 @@ class VendaCaixaEdicaoService
         if (!$pertence) {
             throw new CaixaMovimentacaoException(
                 'A associação histórica da venda com o caixa mudou durante a edição. Tente novamente.'
+            );
+        }
+    }
+
+    private function validarInvariantesDepoisDaOperacao(
+        int $vendaId,
+        int $empresaId,
+        AberturaCaixa $abertura,
+        bool $vinculoLegado
+    ): void {
+        // DELETE intencional é permitido enquanto o caixa está aberto. Nesse
+        // caso não existe linha para revalidar; o fechamento posterior verá a
+        // exclusão porque ainda está esperando o lock da mesma abertura.
+        $venda = Venda::query()
+            ->whereKey($vendaId)
+            ->where('empresa_id', $empresaId)
+            ->first();
+
+        if (!$venda) {
+            return;
+        }
+
+        if ((int) $venda->usuario_id !== (int) $abertura->usuario_id) {
+            throw new CaixaMovimentacaoException(
+                'A edição tentou alterar o operador histórico de uma venda vinculada ao caixa.'
+            );
+        }
+
+        if ($vinculoLegado) {
+            if ($venda->abertura_caixa_id !== null) {
+                throw new CaixaMovimentacaoException(
+                    'A edição tentou alterar o vínculo histórico de caixa da venda.'
+                );
+            }
+
+            return;
+        }
+
+        if ((int) ($venda->abertura_caixa_id ?? 0) !== (int) $abertura->id) {
+            throw new CaixaMovimentacaoException(
+                'A edição tentou alterar o vínculo histórico de caixa da venda.'
             );
         }
     }
