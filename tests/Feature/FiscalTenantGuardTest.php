@@ -10,6 +10,7 @@ use App\Http\Controllers\AppFiscal\ProdutoController as AppProdutoController;
 use App\Http\Controllers\ConfigNotaController;
 use App\Http\Controllers\NaturezaController;
 use App\Http\Controllers\ProductController;
+use App\Http\Middleware\HashEmpresa;
 use App\Http\Middleware\ResolveFiscalApiTenantContext;
 use App\Http\Middleware\ResolveFiscalWebTenantContext;
 use App\Models\ConfigNota;
@@ -69,6 +70,22 @@ class FiscalTenantGuardTest extends TestCase
 
         $this->assertSame(10, (int) $request->empresa_id);
         $this->assertContains(['produto', 10, 93], $guard->calls);
+    }
+
+    public function test_api_produto_utilitario_sem_dado_empresarial_nao_exige_tenant(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/api/produtos/getBarcode',
+            'GET',
+            ApiProdutoController::class . '@getBarcode',
+            ['empresa_id' => 999]
+        );
+
+        (new ResolveFiscalApiTenantContext($guard))->handle($request, fn ($req) => response()->json(['ok' => true]));
+
+        $this->assertSame(999, (int) $request->empresa_id);
+        $this->assertSame([], $guard->calls);
     }
 
     public function test_appfiscal_produto_deriva_tenant_do_token_e_valida_recurso(): void
@@ -155,6 +172,38 @@ class FiscalTenantGuardTest extends TestCase
         $this->assertContains(['config_nota', 30, 97], $guard->calls);
     }
 
+    public function test_hash_empresa_nao_sobrescreve_tenant_ja_verificado(): void
+    {
+        $request = Request::create('/api/nfe/transmitir', 'POST', [
+            'empresa_id' => 999,
+            'hash' => 'hash-de-outro-tenant',
+        ]);
+        $request->attributes->set(FiscalTenantGuardService::VERIFIED_TENANT_ATTRIBUTE, 44);
+
+        $response = (new HashEmpresa())->handle(
+            $request,
+            fn ($req) => response()->json(['empresa_id' => (int) $req->empresa_id])
+        );
+
+        $this->assertSame(44, (int) $request->empresa_id);
+        $this->assertSame(44, (int) $response->getData(true)['empresa_id']);
+    }
+
+    public function test_hash_empresa_rejeita_request_sem_identidade_de_tenant(): void
+    {
+        $request = Request::create('/api/nfe/transmitir', 'POST', [
+            'empresa_id' => 999,
+        ]);
+
+        $response = (new HashEmpresa())->handle(
+            $request,
+            fn () => response()->json(['ok' => true])
+        );
+
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame(999, (int) $request->empresa_id);
+    }
+
     public function test_kernel_registra_guardas_de_tenant_fiscal(): void
     {
         $kernel = (string) file_get_contents(app_path('Http/Kernel.php'));
@@ -223,6 +272,7 @@ class RecordingFiscalTenantGuard extends FiscalTenantGuardService
     public function empresaIdPorHash(Request $request): int
     {
         $request->merge(['empresa_id' => 10]);
+        $request->attributes->set(self::VERIFIED_TENANT_ATTRIBUTE, 10);
         $this->calls[] = ['hash_tenant', 10];
         return 10;
     }
@@ -230,6 +280,7 @@ class RecordingFiscalTenantGuard extends FiscalTenantGuardService
     public function empresaIdPorTokenApp(Request $request): int
     {
         $request->merge(['empresa_id' => 20]);
+        $request->attributes->set(self::VERIFIED_TENANT_ATTRIBUTE, 20);
         $this->calls[] = ['app_tenant', 20];
         return 20;
     }
@@ -237,6 +288,7 @@ class RecordingFiscalTenantGuard extends FiscalTenantGuardService
     public function empresaIdDaSessao(Request $request): int
     {
         $request->merge(['empresa_id' => 30]);
+        $request->attributes->set(self::VERIFIED_TENANT_ATTRIBUTE, 30);
         $this->calls[] = ['web_tenant', 30];
         return 30;
     }
