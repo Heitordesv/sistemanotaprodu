@@ -142,7 +142,7 @@ class FiscalSecretsSecurityTest extends TestCase
         $this->assertStringNotContainsString('Certificado::first', $source);
         $this->assertStringContainsString('FiscalCertificateService', $source);
         $this->assertStringContainsString('(int) $request->empresa_id', $source);
-        $this->assertStringContainsString("'empresa_id' => $request->empresa_id", $source);
+        $this->assertStringContainsString("'empresa_id' => \$request->empresa_id", $source);
     }
 
     public function test_pdv_nao_retorna_csc_ou_senha_do_certificado(): void
