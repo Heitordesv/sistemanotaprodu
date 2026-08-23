@@ -86,6 +86,8 @@ jobs:
           vendor/bin/phpunit tests/Feature/VendaErroSeguroTest.php
           vendor/bin/phpunit tests/Feature/MercadoPagoConciliacaoDeterministicaTest.php
           vendor/bin/phpunit tests/Feature/MercadoPagoGeracaoIdempotenteTest.php
+          vendor/bin/phpunit tests/Feature/MercadoPagoWebhookSecurityTest.php
+          vendor/bin/phpunit tests/Feature/MercadoPagoAuthorizationTest.php
 
       - name: MySQL InnoDB concurrency and migration tests
         run: |
