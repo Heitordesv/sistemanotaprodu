@@ -19,7 +19,6 @@ use App\Models\Venda;
 use App\Models\VendaCaixa;
 use App\Services\FiscalTenantGuardService;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Route;
 use Tests\TestCase;
 
 class FiscalTenantGuardTest extends TestCase
@@ -189,16 +188,31 @@ class FiscalTenantGuardTest extends TestCase
         array $routeParameters = []
     ): Request {
         $request = Request::create($uri, $method, $input);
-        $route = new Route([$method], $uri, ['uses' => $action]);
-        $route->bind($request);
-
-        foreach ($routeParameters as $key => $value) {
-            $route->setParameter($key, $value);
-        }
-
+        $route = new FiscalTenantTestRoute($action, $routeParameters);
         $request->setRouteResolver(fn () => $route);
 
+        $this->assertSame($action, $request->route()->getActionName());
+
         return $request;
+    }
+}
+
+class FiscalTenantTestRoute
+{
+    public function __construct(
+        private string $actionName,
+        private array $routeParameters = []
+    ) {
+    }
+
+    public function getActionName(): string
+    {
+        return $this->actionName;
+    }
+
+    public function parameters(): array
+    {
+        return $this->routeParameters;
     }
 }
 
