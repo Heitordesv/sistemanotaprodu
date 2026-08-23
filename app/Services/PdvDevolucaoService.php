@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\AberturaCaixa;
+use App\Models\AutorizacaoDevolucao;
 use App\Models\PdvDevolucao;
+use App\Models\Usuario;
 use App\Models\VendaCaixa;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +15,8 @@ use RuntimeException;
 
 class PdvDevolucaoService
 {
+    private const SEFAZ_PROCESSING_TTL_SECONDS = 120;
+
     public function __construct(
         private AutorizacaoDevolucaoService $autorizacaoService,
         private DevolucaoEstoqueService $estoqueService,
@@ -40,6 +45,10 @@ class PdvDevolucaoService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            // Evita que um fechamento transforme o caixa original em fechado no
+            // meio da decisão sobre compensação financeira.
+            $this->lockAberturaOriginal($venda);
+
             $existente = PdvDevolucao::query()
                 ->where('venda_caixa_id', $vendaId)
                 ->lockForUpdate()
@@ -67,7 +76,7 @@ class PdvDevolucaoService
 
             if ($this->ehNfceAutorizada($venda)) {
                 throw ValidationException::withMessages([
-                    'venda' => 'Esta venda possui NFC-e autorizada. Use o cancelamento fiscal para que a SEFAZ seja cancelada antes da devolução local.',
+                    'venda' => 'Esta venda possui NFC-e autorizada. Use o cancelamento fiscal para cancelar a SEFAZ antes da devolução local.',
                 ]);
             }
 
@@ -140,6 +149,8 @@ class PdvDevolucaoService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->lockAberturaOriginal($venda);
+
             $existente = PdvDevolucao::query()
                 ->where('venda_caixa_id', $vendaId)
                 ->lockForUpdate()
@@ -160,17 +171,32 @@ class PdvDevolucaoService
                     ];
                 }
 
-                if ($existente->status === 'aguardando_sefaz') {
+                if ($existente->status === 'aguardando_sefaz' && !$this->operacaoSefazExpirada($existente)) {
                     throw ValidationException::withMessages([
                         'venda' => 'O cancelamento desta NFC-e já está em processamento. Aguarde a conclusão antes de enviar novamente.',
                     ]);
                 }
 
-                // falha_sefaz pode ser reprocessada. A consulta prévia à SEFAZ no
-                // serviço fiscal impede um segundo evento caso a primeira tentativa
-                // tenha sido homologada e apenas a resposta local tenha se perdido.
+                if (!in_array($existente->status, ['aguardando_sefaz', 'falha_sefaz'], true)) {
+                    throw ValidationException::withMessages([
+                        'venda' => 'A devolução está em um estado que exige reconciliação antes de novo cancelamento fiscal.',
+                    ]);
+                }
+
+                // Retry de falha ou operação abandonada: revalida financeiro e caixa.
+                // A consulta prévia da própria SEFAZ no serviço fiscal torna o retry
+                // idempotente se a homologação anterior ocorreu e a resposta se perdeu.
+                $this->financeiroService->validarPreCondicoes(
+                    $venda,
+                    $autorizacao['solicitante']
+                );
+
                 $existente->status = 'aguardando_sefaz';
-                $existente->motivo = $motivo;
+                $existente->motivo = trim($motivo);
+                $existente->usuario_solicitante_id = (int) $autorizacao['solicitante']->id;
+                $existente->usuario_solicitante_nome = (string) $autorizacao['solicitante']->nome;
+                $existente->usuario_autorizador_id = (int) $autorizacao['autorizador']->id;
+                $existente->usuario_autorizador_nome = (string) $autorizacao['autorizador']->nome;
                 $existente->save();
 
                 return [
@@ -248,6 +274,9 @@ class PdvDevolucaoService
             ];
         }
 
+        // Este commit é intencionalmente separado do processamento local. Se o
+        // processo cair depois daqui, a próxima tentativa vê sefaz_cancelada e
+        // conclui estoque/financeiro SEM reenviar o evento fiscal.
         DB::transaction(function () use ($preparo, $sefaz) {
             $devolucao = PdvDevolucao::query()
                 ->where('id', (int) $preparo['devolucao_id'])
@@ -262,7 +291,10 @@ class PdvDevolucaoService
             $devolucao->save();
         }, 5);
 
-        return $this->concluirFiscalLocal((int) $preparo['devolucao_id'], $sefaz['data'] ?? null);
+        return $this->concluirFiscalLocal(
+            (int) $preparo['devolucao_id'],
+            $sefaz['data'] ?? null
+        );
     }
 
     private function concluirFiscalLocal(int $devolucaoId, ?array $sefazData = null): array
@@ -279,6 +311,8 @@ class PdvDevolucaoService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->lockAberturaOriginal($venda);
+
             if ($devolucao->status === 'concluida') {
                 return ['devolucao' => $devolucao, 'pendente' => false];
             }
@@ -287,12 +321,12 @@ class PdvDevolucaoService
                 throw new RuntimeException('A devolução fiscal ainda não possui confirmação de cancelamento da SEFAZ.');
             }
 
-            $solicitante = \App\Models\Usuario::query()
+            $solicitante = Usuario::query()
                 ->where('id', (int) $devolucao->usuario_solicitante_id)
                 ->where('empresa_id', (int) $devolucao->empresa_id)
                 ->firstOrFail();
 
-            $autorizador = \App\Models\Usuario::query()
+            $autorizador = Usuario::query()
                 ->where('id', (int) $devolucao->usuario_autorizador_id)
                 ->where('empresa_id', (int) $devolucao->empresa_id)
                 ->firstOrFail();
@@ -309,13 +343,13 @@ class PdvDevolucaoService
                 $devolucao->estoque_processado_em = now();
             }
 
-            // O estado fiscal local deve refletir a SEFAZ mesmo quando uma
-            // reconciliação financeira excepcional ficou pendente.
+            // A verdade fiscal local precisa acompanhar a SEFAZ mesmo que uma
+            // reconciliação financeira excepcional fique pendente.
             $venda->estado_emissao = 'cancelado';
             $venda->retorno_estoque = 1;
             $venda->save();
 
-            if (!$devolucao->concluida_em && !$this->autorizacaoJaRegistrada($devolucao)) {
+            if (!$this->autorizacaoJaRegistrada($devolucao)) {
                 $this->autorizacaoService->registrar(
                     $venda,
                     $solicitante,
@@ -380,7 +414,7 @@ class PdvDevolucaoService
                 ], JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION),
             ]);
         } catch (QueryException $e) {
-            // Em corrida real a UNIQUE(venda_caixa_id) é a última barreira.
+            // UNIQUE(venda_caixa_id) é a última barreira contra corrida dupla.
             if ((string) $e->getCode() === '23000') {
                 $existente = PdvDevolucao::query()
                     ->where('venda_caixa_id', (int) $venda->id)
@@ -419,8 +453,12 @@ class PdvDevolucaoService
     private function marcarFalhaSefaz(int $devolucaoId, string $mensagem, ?array $sefaz = null): void
     {
         DB::transaction(function () use ($devolucaoId, $mensagem, $sefaz) {
-            $devolucao = PdvDevolucao::query()->where('id', $devolucaoId)->lockForUpdate()->first();
-            if (!$devolucao || $devolucao->status === 'sefaz_cancelada' || $devolucao->status === 'concluida') {
+            $devolucao = PdvDevolucao::query()
+                ->where('id', $devolucaoId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$devolucao || in_array($devolucao->status, ['sefaz_cancelada', 'concluida'], true)) {
                 return;
             }
 
@@ -430,6 +468,41 @@ class PdvDevolucaoService
             $devolucao->sefaz_mensagem = mb_substr($mensagem, 0, 255);
             $devolucao->save();
         }, 5);
+    }
+
+    private function lockAberturaOriginal(VendaCaixa $venda): ?AberturaCaixa
+    {
+        if ((int) ($venda->abertura_caixa_id ?? 0) > 0) {
+            return AberturaCaixa::query()
+                ->where('id', (int) $venda->abertura_caixa_id)
+                ->where('empresa_id', (int) $venda->empresa_id)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        // Fallback para vendas legadas anteriores ao vínculo explícito do caixa.
+        return AberturaCaixa::query()
+            ->where('empresa_id', (int) $venda->empresa_id)
+            ->where('usuario_id', (int) $venda->usuario_id)
+            ->where('created_at', '<=', $venda->created_at)
+            ->where(function ($query) use ($venda) {
+                $query->where('status', 0)
+                    ->orWhere('updated_at', '>=', $venda->created_at);
+            })
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function operacaoSefazExpirada(PdvDevolucao $devolucao): bool
+    {
+        if (!$devolucao->updated_at) {
+            return true;
+        }
+
+        return $devolucao->updated_at->lte(
+            now()->subSeconds(self::SEFAZ_PROCESSING_TTL_SECONDS)
+        );
     }
 
     private function ehNfceAutorizada(VendaCaixa $venda): bool
@@ -442,7 +515,7 @@ class PdvDevolucaoService
 
     private function autorizacaoJaRegistrada(PdvDevolucao $devolucao): bool
     {
-        return \App\Models\AutorizacaoDevolucao::query()
+        return AutorizacaoDevolucao::query()
             ->where('empresa_id', (int) $devolucao->empresa_id)
             ->where('venda_caixa_id', (int) $devolucao->venda_caixa_id)
             ->where('tipo', 'cancelamento_fiscal')
@@ -463,6 +536,7 @@ class PdvDevolucaoService
                 'id' => (int) $devolucao->id,
                 'status' => (string) $devolucao->status,
                 'idempotente' => $idempotente,
+                'pendente_financeiro' => $devolucao->status === 'pendente_financeiro',
             ],
         ];
 
