@@ -399,7 +399,8 @@ class FiscalTenantGuardTest extends TestCase
     {
         $source = (string) file_get_contents(app_path('Http/Controllers/AppFiscal/ConfigEmitenteController.php'));
 
-        $this->assertStringContainsString("'empresa_id' => \$request->empresa_id", $source);
+        $this->assertStringContainsString('$empresaId = (int) $request->empresa_id;', $source);
+        $this->assertStringContainsString("'empresa_id' => \$empresaId", $source);
     }
 
     public function test_appfiscal_fiscal_controllers_estao_dentro_do_boundary_central(): void
