@@ -13,6 +13,18 @@ use Illuminate\Validation\ValidationException;
 
 class VendaTenantGuardService
 {
+    public function prepararUpdate(Request $request, int $vendaId): Venda
+    {
+        $venda = $this->validar($request, $vendaId);
+
+        // abertura_caixa_id existe no $fillable somente para permitir a criação
+        // vinculada ao caixa resolvido pelo servidor. Depois da criação, o vínculo
+        // histórico é imutável e nunca pode vir de PUT/PATCH do navegador.
+        $request->request->remove('abertura_caixa_id');
+
+        return $venda;
+    }
+
     public function validar(Request $request, ?int $vendaId = null): ?Venda
     {
         $empresaId = (int) $request->empresa_id;
