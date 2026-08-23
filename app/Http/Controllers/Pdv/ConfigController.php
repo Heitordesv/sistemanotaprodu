@@ -57,12 +57,12 @@ class ConfigController extends Controller
 		return response()->json($objeto, 200);
 	}
 
+	/**
+	 * Endpoint legado usado apenas como teste de conectividade pelo PDV Java.
+	 * KEY_APP não é mais enviado pelo cliente nem validado aqui.
+	 */
 	public function teste(Request $request){
-		if($request->chave == env("KEY_APP")){
-			return response()->json("ok", 200);
-		}else{
-			return response()->json("erro", 401);
-		}	
+		return response()->json("ok", 200);
 	}
 
 }
