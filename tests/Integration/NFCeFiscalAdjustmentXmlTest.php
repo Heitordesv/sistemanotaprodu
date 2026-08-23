@@ -3,6 +3,7 @@
 namespace Tests\Integration;
 
 use App\Services\NFCeItemAdjustmentRateioService;
+use App\Services\NFCeApproximateTaxService;
 use DOMDocument;
 use NFePHP\Common\Validator;
 use NFePHP\NFe\Make;
@@ -19,6 +20,8 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
             10.00,
             20.00
         );
+        $tributos = new NFCeApproximateTaxService();
+        $totalTributosCentavos = 0;
 
         $make = new Make();
 
@@ -76,6 +79,8 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
         foreach ($valores as $indice => $valorProduto) {
             $item = $indice + 1;
             $ajuste = $rateio[$indice];
+            $tributosItem = $tributos->calcularItem($valorProduto, 12.34, 17.89, 0.57);
+            $totalTributosCentavos += $tributosItem['total_centavos'];
 
             $make->tagprod((object) [
                 'item' => $item,
@@ -98,7 +103,10 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
                 'indTot' => 1,
             ]);
 
-            $make->tagimposto((object) ['item' => $item], '0.00');
+            $make->tagimposto((object) [
+                'item' => $item,
+                'vTotTrib' => $tributos->formatarCentavos($tributosItem['total_centavos']),
+            ]);
             $make->tagICMSSN((object) [
                 'item' => $item,
                 'orig' => 0,
@@ -136,7 +144,7 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
             'vCOFINS' => '0.00',
             'vOutro' => '10.00',
             'vNF' => '40.00',
-            'vTotTrib' => '0.00',
+            'vTotTrib' => $tributos->formatarCentavos($totalTributosCentavos),
         ]);
 
         $make->tagtransp((object) ['modFrete' => 9]);
@@ -165,6 +173,10 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
         $this->assertSame(
             '20.00',
             $this->somaTagsDosItens($dom, 'vFrete')
+        );
+        $this->assertSame(
+            $tributos->formatarCentavos($totalTributosCentavos),
+            $this->somaTagsDosItens($dom, 'vTotTrib')
         );
 
         $totais = $dom->getElementsByTagName('ICMSTot')->item(0);
