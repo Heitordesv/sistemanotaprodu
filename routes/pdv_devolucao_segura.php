@@ -14,8 +14,12 @@ $middlewares = [
     'throttle:20,1',
 ];
 
+// Usa exatamente o mesmo nome de parâmetro criado por Route::resource(). Isso
+// substitui a assinatura dinâmica legada no RouteCollection; usar {id} criaria
+// outra rota compatível com a mesma URL e deixaria FrontBoxController@destroy
+// vencer a resolução.
 Route::middleware($middlewares)
-    ->delete('/frenteCaixa/{id}', [PdvDevolucaoController::class, 'devolver'])
+    ->delete('/frenteCaixa/{frenteCaixa}', [PdvDevolucaoController::class, 'devolver'])
     ->name('frenteCaixa.destroy');
 
 // A URL permanece /api/nfce/cancelar para não quebrar o JavaScript atual,
