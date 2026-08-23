@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\CaixaFechamentoController;
-use App\Http\Controllers\FrontBoxController;
 use App\Http\Controllers\FrontBoxResumoController;
 use App\Http\Controllers\SangriaCaixaController;
 use App\Http\Controllers\SuprimentoCaixaController;
@@ -28,9 +27,10 @@ Route::middleware($financeMiddlewares)
     ->name('frenteCaixa.index');
 
 // PDV: venda só pode ser persistida enquanto a abertura atual permanece
-// bloqueada. Se o fechamento vencer primeiro, a venda é rejeitada.
+// bloqueada. O controller endurecido também valida produtos/cliente/filial
+// contra a empresa autenticada antes de qualquer baixa de estoque.
 Route::middleware(array_merge($financeMiddlewares, ['caixaMovimento:obrigatorio']))
-    ->post('/frenteCaixa', [FrontBoxController::class, 'store'])
+    ->post('/frenteCaixa', [FrontBoxResumoController::class, 'store'])
     ->name('frenteCaixa.store');
 
 Route::middleware(array_merge($financeMiddlewares, ['caixaMovimento:obrigatorio']))
