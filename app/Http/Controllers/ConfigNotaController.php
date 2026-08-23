@@ -84,6 +84,8 @@ class ConfigNotaController extends Controller
             $infoCertificado = $this->getInfoCertificado($item);
         }
 
+        $cscCadastrado = $item !== null && !empty($item->getRawOriginal('csc'));
+
         $this->maskSecretsForForm($item);
         $this->maskSecretsForForm($config);
 
@@ -104,6 +106,7 @@ class ConfigNotaController extends Controller
                 'listaCSTIPI',
                 'cUF',
                 'cidades',
+                'cscCadastrado',
                 'item'
             )
         );
