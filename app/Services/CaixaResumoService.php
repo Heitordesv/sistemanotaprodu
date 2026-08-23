@@ -38,37 +38,22 @@ class CaixaResumoService
             $ultimaVendaNfeId = (int) $abertura->ultima_venda_nfe;
         }
 
-        $vendasPdv = collect();
-        if ($ultimaVendaNfceId > (int) $abertura->primeira_venda_nfce) {
-            $vendasPdv = VendaCaixa::query()
-                ->where('empresa_id', $empresaId)
-                ->where('usuario_id', $usuarioId)
-                ->where('id', '>', (int) $abertura->primeira_venda_nfce)
-                ->where('id', '<=', $ultimaVendaNfceId)
-                ->get();
-        }
+        $vendasPdv = $this->vendasDaAbertura(
+            VendaCaixa::class,
+            $abertura,
+            (int) $abertura->primeira_venda_nfce,
+            $ultimaVendaNfceId
+        );
 
-        $vendasNfe = collect();
-        if ($ultimaVendaNfeId > (int) $abertura->primeira_venda_nfe) {
-            $vendasNfe = Venda::query()
-                ->where('empresa_id', $empresaId)
-                ->where('usuario_id', $usuarioId)
-                ->where('id', '>', (int) $abertura->primeira_venda_nfe)
-                ->where('id', '<=', $ultimaVendaNfeId)
-                ->get();
-        }
+        $vendasNfe = $this->vendasDaAbertura(
+            Venda::class,
+            $abertura,
+            (int) $abertura->primeira_venda_nfe,
+            $ultimaVendaNfeId
+        );
 
-        $suprimentos = SuprimentoCaixa::query()
-            ->where('empresa_id', $empresaId)
-            ->where('usuario_id', $usuarioId)
-            ->whereBetween('created_at', [$abertura->created_at, $fim])
-            ->get();
-
-        $sangrias = SangriaCaixa::query()
-            ->where('empresa_id', $empresaId)
-            ->where('usuario_id', $usuarioId)
-            ->whereBetween('created_at', [$abertura->created_at, $fim])
-            ->get();
+        $suprimentos = $this->movimentacoesDaAbertura(SuprimentoCaixa::class, $abertura, $fim);
+        $sangrias = $this->movimentacoesDaAbertura(SangriaCaixa::class, $abertura, $fim);
 
         $vendas = $this->agruparVendas($vendasNfe, $vendasPdv);
         $somaTiposPagamento = $this->somarTiposPagamento($vendas);
@@ -122,6 +107,66 @@ class CaixaResumoService
             'resultadoFinanceiro' => $resultadoFinanceiro,
             'dinheiroNaGaveta' => $dinheiroNaGaveta,
         ];
+    }
+
+    private function vendasDaAbertura(
+        string $modelClass,
+        AberturaCaixa $abertura,
+        int $primeiraVendaId,
+        int $ultimaVendaId
+    ): Collection {
+        $model = new $modelClass();
+        $query = $modelClass::query()
+            ->where('empresa_id', (int) $abertura->empresa_id)
+            ->where('usuario_id', (int) $abertura->usuario_id);
+
+        if (Schema::hasColumn($model->getTable(), 'abertura_caixa_id')) {
+            $query->where(function ($scope) use ($abertura, $primeiraVendaId, $ultimaVendaId) {
+                $scope->where('abertura_caixa_id', (int) $abertura->id);
+
+                if ($ultimaVendaId > $primeiraVendaId) {
+                    $scope->orWhere(function ($legado) use ($primeiraVendaId, $ultimaVendaId) {
+                        $legado->whereNull('abertura_caixa_id')
+                            ->where('id', '>', $primeiraVendaId)
+                            ->where('id', '<=', $ultimaVendaId);
+                    });
+                }
+            });
+        } else {
+            if ($ultimaVendaId <= $primeiraVendaId) {
+                return collect();
+            }
+
+            $query->where('id', '>', $primeiraVendaId)
+                ->where('id', '<=', $ultimaVendaId);
+        }
+
+        return $query->orderBy('id')->get();
+    }
+
+    private function movimentacoesDaAbertura(
+        string $modelClass,
+        AberturaCaixa $abertura,
+        Carbon $fim
+    ): Collection {
+        $model = new $modelClass();
+        $query = $modelClass::query()
+            ->where('empresa_id', (int) $abertura->empresa_id)
+            ->where('usuario_id', (int) $abertura->usuario_id);
+
+        if (Schema::hasColumn($model->getTable(), 'abertura_caixa_id')) {
+            $query->where(function ($scope) use ($abertura, $fim) {
+                $scope->where('abertura_caixa_id', (int) $abertura->id)
+                    ->orWhere(function ($legado) use ($abertura, $fim) {
+                        $legado->whereNull('abertura_caixa_id')
+                            ->whereBetween('created_at', [$abertura->created_at, $fim]);
+                    });
+            });
+        } else {
+            $query->whereBetween('created_at', [$abertura->created_at, $fim]);
+        }
+
+        return $query->orderBy('created_at')->orderBy('id')->get();
     }
 
     private function recebimentosDaAbertura(AberturaCaixa $abertura, Carbon $fim): Collection
