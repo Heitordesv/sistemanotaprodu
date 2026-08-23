@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use RuntimeException;
+use Throwable;
 
 class ContaReceberPagamentoController extends Controller
 {
@@ -31,7 +33,7 @@ class ContaReceberPagamentoController extends Controller
         $totalHistorico = round((float) $pagamentos->sum('valor'), 2);
         $recebidoAnteriorAoHistorico = round(max(0, (float) $item->valor_recebido - $totalHistorico), 2);
         $lotePagamento = (string) Str::uuid();
-        $formasPagamento = ContaReceber::tiposPagamento();
+        $formasPagamento = $this->formasPagamentoRecebiveis();
 
         return view('conta_receber.pay', compact(
             'item',
@@ -51,7 +53,7 @@ class ContaReceberPagamentoController extends Controller
             abort(403);
         }
 
-        $formasValidas = array_keys(ContaReceber::tiposPagamento());
+        $formasValidas = array_keys($this->formasPagamentoRecebiveis());
 
         $validated = $request->validate([
             'data_recebimento' => ['required', 'date'],
@@ -63,7 +65,7 @@ class ContaReceberPagamentoController extends Controller
         ], [
             'pagamentos.required' => 'Informe pelo menos uma forma de pagamento.',
             'pagamentos.*.forma_pagamento.required' => 'Selecione a forma de pagamento.',
-            'pagamentos.*.forma_pagamento.in' => 'Forma de pagamento inválida.',
+            'pagamentos.*.forma_pagamento.in' => 'Forma de pagamento inválida para recebimento.',
             'pagamentos.*.valor.required' => 'Informe o valor de cada pagamento.',
             'data_recebimento.required' => 'Informe a data do recebimento.',
         ]);
@@ -78,38 +80,52 @@ class ContaReceberPagamentoController extends Controller
                 $validated['lote_pagamento'] ?? null
             );
 
-            $valorRegistrado = round(max(0, (float) $item->valor_recebido - $antes), 2);
+            $idempotente = (bool) $item->getAttribute('recebimento_idempotente');
+            $valorRegistrado = $idempotente
+                ? 0.0
+                : round(max(0, (float) $item->valor_recebido - $antes), 2);
             $restante = round(max(0, (float) $item->valor_integral - (float) $item->valor_recebido), 2);
 
             if ($valorRegistrado > 0) {
                 $this->enviarConfirmacao($item, $valorRegistrado, $restante);
             }
 
-            $mensagem = (int) $item->status === 1
-                ? 'Recebimento registrado. A conta foi quitada com sucesso.'
-                : 'Recebimento parcial registrado. Saldo restante: R$ ' . number_format($restante, 2, ',', '.');
+            if ($idempotente) {
+                $mensagem = 'Este recebimento já havia sido registrado. Nenhum valor foi duplicado.';
+            } else {
+                $mensagem = (int) $item->status === 1
+                    ? 'Recebimento registrado. A conta foi quitada com sucesso.'
+                    : 'Recebimento parcial registrado. Saldo restante: R$ ' . number_format($restante, 2, ',', '.');
+            }
 
-            return redirect($request->input('previous_url', route('conta-receber.index')))
+            return $this->redirectSeguroDepoisDoPagamento($request)
                 ->with('flash_sucesso', $mensagem);
-        } catch (\Throwable $e) {
-            Log::error('Erro ao registrar múltiplas formas em conta a receber', [
+        } catch (RuntimeException $e) {
+            Log::warning('Recebimento rejeitado por regra de negócio', [
                 'conta_id' => $item->id,
                 'empresa_id' => $item->empresa_id,
-                'erro' => $e->getMessage(),
+                'motivo' => $e->getMessage(),
             ]);
 
             return redirect()->back()
                 ->withInput()
                 ->with('flash_erro', $e->getMessage());
+        } catch (Throwable $e) {
+            Log::error('Erro interno ao registrar múltiplas formas em conta a receber', [
+                'conta_id' => $item->id,
+                'empresa_id' => $item->empresa_id,
+                'exception' => $e,
+            ]);
+
+            return redirect()->back()
+                ->withInput()
+                ->with('flash_erro', 'Não foi possível registrar o recebimento. Tente novamente.');
         }
     }
 
     public function receberMassa(Request $request, ContaReceberPagamentoService $service)
     {
-        $formasValidas = array_values(array_diff(
-            array_keys(ContaReceber::tiposPagamento()),
-            ['06', '90']
-        ));
+        $formasValidas = array_keys($this->formasPagamentoRecebiveis());
 
         $validated = $request->validate([
             'ids' => ['required'],
@@ -144,6 +160,13 @@ class ContaReceberPagamentoController extends Controller
                 $validated['lote_pagamento'] ?? (string) Str::uuid()
             );
 
+            if ($resultado['idempotente']) {
+                return redirect()->back()->with(
+                    'flash_sucesso',
+                    'Este lote de recebimento já havia sido processado. Nenhum valor foi duplicado.'
+                );
+            }
+
             $forma = ContaReceber::tiposPagamento()[$validated['tipo_pagamento']] ?? $validated['tipo_pagamento'];
 
             return redirect()->back()->with(
@@ -151,17 +174,65 @@ class ContaReceberPagamentoController extends Controller
                 $resultado['quantidade'] . ' conta(s) recebida(s) via ' . $forma .
                 '. Total: R$ ' . number_format($resultado['total'], 2, ',', '.')
             );
-        } catch (\Throwable $e) {
-            Log::error('Erro ao registrar recebimento em massa', [
+        } catch (RuntimeException $e) {
+            Log::warning('Recebimento em massa rejeitado por regra de negócio', [
                 'empresa_id' => $empresaId,
                 'ids' => $ids,
-                'erro' => $e->getMessage(),
+                'motivo' => $e->getMessage(),
             ]);
 
             return redirect()->back()
                 ->withInput()
                 ->with('flash_erro', $e->getMessage());
+        } catch (Throwable $e) {
+            Log::error('Erro interno ao registrar recebimento em massa', [
+                'empresa_id' => $empresaId,
+                'ids' => $ids,
+                'exception' => $e,
+            ]);
+
+            return redirect()->back()
+                ->withInput()
+                ->with('flash_erro', 'Não foi possível registrar os recebimentos. Tente novamente.');
         }
+    }
+
+    private function formasPagamentoRecebiveis(): array
+    {
+        return array_diff_key(
+            ContaReceber::tiposPagamento(),
+            array_flip(['06', '90'])
+        );
+    }
+
+    private function redirectSeguroDepoisDoPagamento(Request $request)
+    {
+        $fallback = route('conta-receber.index');
+        $destino = trim((string) $request->input('previous_url', ''));
+
+        if ($destino === '') {
+            return redirect()->to($fallback);
+        }
+
+        $partes = parse_url($destino);
+        if ($partes === false) {
+            return redirect()->to($fallback);
+        }
+
+        $scheme = strtolower((string) ($partes['scheme'] ?? ''));
+        if ($scheme !== '' && !in_array($scheme, ['http', 'https'], true)) {
+            return redirect()->to($fallback);
+        }
+
+        if (isset($partes['host'])) {
+            if (strcasecmp((string) $partes['host'], $request->getHost()) !== 0) {
+                return redirect()->to($fallback);
+            }
+        } elseif (!str_starts_with($destino, '/') || str_starts_with($destino, '//')) {
+            return redirect()->to($fallback);
+        }
+
+        return redirect()->to($destino);
     }
 
     private function enviarConfirmacao(ContaReceber $item, float $valorRegistrado, float $restante): void
