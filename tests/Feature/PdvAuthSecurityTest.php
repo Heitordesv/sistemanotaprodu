@@ -74,8 +74,11 @@ class PdvAuthSecurityTest extends TestCase
         $this->assertArrayHasKey('token_expires_at', $data);
         $this->assertArrayHasKey('token_expires_in', $data);
         $this->assertStringNotContainsString('operador', $data['token']);
-        $this->assertStringNotContainsString((string) env('KEY_APP'), $data['token']);
         $this->assertArrayNotHasKey('senha', $data);
+
+        $loginSource = (string) file_get_contents(app_path('Http/Controllers/Pdv/LoginController.php'));
+        $this->assertStringNotContainsString('KEY_APP', $loginSource);
+        $this->assertStringNotContainsString('base64_encode', $loginSource);
 
         $usuario = (new PdvTokenService())->authenticate($data['token']);
         $this->assertSame(7, (int) $usuario->id);
@@ -188,8 +191,7 @@ class PdvAuthSecurityTest extends TestCase
     {
         $source = (string) file_get_contents(app_path('Http/Controllers/Pdv/ConfigController.php'));
 
-        $this->assertStringNotContainsString('env("KEY_APP")', $source);
-        $this->assertStringNotContainsString("env('KEY_APP')", $source);
+        $this->assertStringNotContainsString('KEY_APP', $source);
 
         $response = (new ConfigController())->teste(Request::create('/api/pdv/teste', 'POST'));
         $this->assertSame(200, $response->getStatusCode());
