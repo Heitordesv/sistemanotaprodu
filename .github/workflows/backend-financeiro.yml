@@ -66,6 +66,7 @@ jobs:
         run: >-
           vendor/bin/phpunit
           tests/Feature/CaixaRecebimentosTest.php
+          tests/Feature/CaixaVinculoAberturaTest.php
           tests/Feature/CaixaMovimentacaoRoutesTest.php
           tests/Feature/ContaReceberPagamentoConcorrenciaTest.php
           tests/Feature/ContaReceberPagamentoIdempotenciaTest.php
