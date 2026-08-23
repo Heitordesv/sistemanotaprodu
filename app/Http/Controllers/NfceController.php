@@ -8,9 +8,9 @@ use App\Models\ConfigNota;
 use App\Models\VendaCaixa;
 use App\Models\Usuario;
 use App\Services\NFCeService;
+use App\Services\PdvReceiptPdfService;
 use Illuminate\Http\Request;
 use NFePHP\DA\NFe\Cupom;
-use NFePHP\DA\NFe\CupomNaoFiscal;
 use NFePHP\DA\NFe\Danfce;
 
 class NfceController extends Controller
@@ -203,7 +203,7 @@ class NfceController extends Controller
 		return redirect()->back();
 	}
 
-	public function imprimirNaoFiscal($id)
+	public function imprimirNaoFiscal($id, PdvReceiptPdfService $receiptService)
 	{
 		$venda = VendaCaixa::
 		where('id', $id)
@@ -216,7 +216,9 @@ class NfceController extends Controller
 			->first();
 
 			if($config->logo){
-				$logo = 'data://text/plain;base64,'. base64_encode(file_get_contents(public_path('uploads/configEmitente/') . $config->logo));
+				$logoPath = public_path('uploads/configEmitente/') . $config->logo;
+				$logoMime = mime_content_type($logoPath) ?: 'image/jpeg';
+				$logo = 'data:' . $logoMime . ';base64,' . base64_encode(file_get_contents($logoPath));
 			}else{
 				$logo = null;
 			}
@@ -234,12 +236,10 @@ class NfceController extends Controller
 				$cupom->monta();
 				$pdf = $cupom->render();
 			}else{
-				$cupom = new CupomNaoFiscal($venda, $config);
-
-				if($usuario->config){
-					$cupom->setPaperWidth($usuario->config->impressora_modelo);
-				}
-				$pdf = $cupom->render($logo);
+				$paperWidth = $usuario->config
+					? (int) $usuario->config->impressora_modelo
+					: 80;
+				$pdf = $receiptService->render($venda, $config, $logo, $paperWidth);
 			}
 
 			return response($pdf)
