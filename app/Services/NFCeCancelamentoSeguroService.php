@@ -3,63 +3,68 @@
 namespace App\Services;
 
 use App\Models\ConfigNota;
-use App\Models\Contigencia;
 use App\Models\VendaCaixa;
-use NFePHP\Common\Certificate;
-use NFePHP\Common\Soap\SoapCurl;
 use NFePHP\NFe\Common\Standardize;
 use NFePHP\NFe\Complements;
-use NFePHP\NFe\Factories\Contingency;
 use NFePHP\NFe\Tools;
 use RuntimeException;
 
 class NFCeCancelamentoSeguroService
 {
+    public function __construct(
+        private NFCeConsultaCancelamentoParser $cancelamentoParser,
+        private NFCeToolsFactory $toolsFactory
+    ) {
+    }
+
     public function cancelar(VendaCaixa $venda, string $motivo): array
     {
         $config = ConfigNota::query()
             ->where('empresa_id', (int) $venda->empresa_id)
             ->firstOrFail();
 
-        $tools = $this->tools($config);
+        $tools = $this->toolsFactory->make($config);
         $chave = preg_replace('/\D/', '', (string) $venda->chave);
 
         if (strlen($chave) !== 44) {
             throw new RuntimeException('A NFC-e não possui uma chave de acesso válida para cancelamento.');
         }
 
-        // A consulta antes do evento torna o retry seguro e também recupera o
-        // protocolo de autorização diretamente da SEFAZ, sem confiar em dado do browser.
+        // Consulta a situação atual antes de qualquer novo evento. protNFe é usado
+        // somente para recuperar o protocolo de autorização; a detecção de um
+        // cancelamento anterior é feita pelo status da consulta e pelos eventos
+        // tpEvento=110111 retornados em procEventoNFe/retEvento.
         $consultaXml = $tools->sefazConsultaChave($chave);
         $consulta = (new Standardize($consultaXml))->toArray();
-        $infProt = $consulta['protNFe']['infProt'] ?? [];
-        $statusAtual = (string) ($infProt['cStat'] ?? '');
 
-        // Se a própria consulta já informa documento cancelado, tratamos como
-        // sucesso idempotente e não disparamos um segundo evento.
-        if (in_array($statusAtual, ['101', '151', '155'], true)) {
-            $retorno = [
-                'retEvento' => [
-                    'infEvento' => [
-                        'cStat' => $statusAtual,
-                        'xMotivo' => (string) ($infProt['xMotivo'] ?? 'Cancelamento já homologado.'),
-                        'nProt' => $infProt['nProt'] ?? null,
-                        'chNFe' => $chave,
-                    ],
-                ],
-            ];
+        $cancelamentoExistente = $this->cancelamentoParser->detectar($consulta, $chave);
+        if ($cancelamentoExistente !== null) {
+            $cStat = (string) $cancelamentoExistente['cstat'];
+            $mensagem = (string) $cancelamentoExistente['mensagem'];
+            $protocolo = $cancelamentoExistente['protocolo'] ?? null;
 
             return [
                 'ok' => true,
-                'data' => $retorno,
-                'cstat' => $statusAtual,
-                'protocolo' => $infProt['nProt'] ?? null,
-                'mensagem' => (string) ($infProt['xMotivo'] ?? 'Cancelamento já homologado.'),
+                'data' => [
+                    'retEvento' => [
+                        'infEvento' => [
+                            'cStat' => $cStat,
+                            'xMotivo' => $mensagem,
+                            'nProt' => $protocolo,
+                            'chNFe' => $chave,
+                            'tpEvento' => '110111',
+                        ],
+                    ],
+                ],
+                'cstat' => $cStat,
+                'protocolo' => $protocolo,
+                'mensagem' => $mensagem,
                 'xml_salvo' => is_file(public_path('xml_nfce_cancelada/' . $chave . '.xml')),
                 'ja_cancelada' => true,
             ];
         }
 
+        $infProt = $consulta['protNFe']['infProt'] ?? [];
         $protocoloAutorizacao = (string) ($infProt['nProt'] ?? '');
         if ($protocoloAutorizacao === '') {
             throw new RuntimeException('A SEFAZ não retornou o protocolo de autorização desta NFC-e.');
@@ -108,45 +113,6 @@ class NFCeCancelamentoSeguroService
         ];
     }
 
-    private function tools(ConfigNota $config): Tools
-    {
-        $cnpj = preg_replace('/\D/', '', (string) $config->cnpj);
-        $serviceConfig = [
-            'atualizacao' => date('Y-m-d H:i:s'),
-            'tpAmb' => (int) $config->ambiente,
-            'razaosocial' => (string) $config->razao_social,
-            'siglaUF' => (string) $config->cidade->uf,
-            'cnpj' => $cnpj,
-            'schemes' => 'PL_009_V4',
-            'versao' => '4.00',
-            'tokenIBPT' => 'AAAAAAA',
-            'CSC' => (string) $config->csc,
-            'CSCid' => (string) $config->csc_id,
-        ];
-
-        $tools = new Tools(
-            json_encode($serviceConfig),
-            Certificate::readPfx($config->arquivo, $config->senha)
-        );
-
-        $soapCurl = new SoapCurl();
-        $soapCurl->httpVersion('1.1');
-        $tools->loadSoapClass($soapCurl);
-        $tools->model(65);
-
-        $contingencia = Contigencia::query()
-            ->where('empresa_id', (int) $config->empresa_id)
-            ->where('status', 1)
-            ->where('documento', 'NFCe')
-            ->first();
-
-        if ($contingencia) {
-            $tools->contingency = new Contingency($contingencia->status_retorno);
-        }
-
-        return $tools;
-    }
-
     private function salvarXmlCancelamento(Tools $tools, string $response, string $chave): bool
     {
         $diretorio = public_path('xml_nfce_cancelada');
@@ -158,9 +124,6 @@ class NFCeCancelamentoSeguroService
             $xml = Complements::toAuthorize($tools->lastRequest, $response);
             return file_put_contents($diretorio . DIRECTORY_SEPARATOR . $chave . '.xml', $xml) !== false;
         } catch (\Throwable $e) {
-            // O cancelamento fiscal já pode ter sido homologado; falha ao escrever
-            // arquivo local não pode disparar um segundo cancelamento. O ledger
-            // registrará a SEFAZ como concluída e permitirá reconciliação posterior.
             report($e);
             return false;
         }
