@@ -135,7 +135,7 @@ $('#btn-cancelar-send').click(() => {
         let mensagem = "[" + infEvento.cStat + "] " + infEvento.xMotivo
 
         if(success.pdv_devolucao && success.pdv_devolucao.pendente_financeiro){
-            mensagem += "\n\nA NFC-e e o estoque foram cancelados, mas existe uma reconciliação financeira pendente. Não refaça o cancelamento."
+            mensagem += "\n\nA NFC-e e o estoque já foram cancelados. Falta somente regularizar o financeiro. Depois, use 'Retomar financeiro'; a SEFAZ não será chamada novamente."
         }
 
         swal("Sucesso", mensagem, "success")
