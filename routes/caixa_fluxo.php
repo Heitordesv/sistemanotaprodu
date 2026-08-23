@@ -50,9 +50,10 @@ Route::middleware(array_merge($financeMiddlewares, ['caixaMovimento:venda-opcion
     ->post('/vendas', [VendaSeguraController::class, 'store'])
     ->name('vendas.store');
 
-// Edição não pode trocar a abertura histórica da venda. O controller seguro
-// remove abertura_caixa_id do PUT/PATCH e valida venda/natureza/produtos e
-// demais referências contra a empresa autenticada.
+// O resource legado registra PUT/PATCH /vendas/{venda}. Usar exatamente o
+// mesmo padrão aqui faz esta rota, carregada depois de web.php, substituir a
+// definição insegura em vez de criar uma segunda rota dinâmica concorrente.
+// O vínculo abertura_caixa_id permanece imutável no controller seguro.
 Route::middleware($financeMiddlewares)
-    ->match(['put', 'patch'], '/vendas/{id}', [VendaSeguraController::class, 'update'])
+    ->match(['put', 'patch'], '/vendas/{venda}', [VendaSeguraController::class, 'update'])
     ->name('vendas.update');
