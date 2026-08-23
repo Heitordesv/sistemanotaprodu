@@ -98,13 +98,35 @@ class ContaReceberMercadoPagoController extends Controller
     private function executarAdmin(int $id, callable $callback)
     {
         try {
+            // Primeiro resolve a conta usando a sessão autenticada/tenant atual.
             $conta = $this->contaDaEmpresa($id);
-            return response()->json($callback($conta));
+
+            // A aprovação do Mercado Pago é um recebimento automático externo,
+            // e não uma operação física de um caixa. O observer legado de
+            // ContaReceber usa user_logged para descobrir o caixa; se a sessão
+            // permanecesse ativa, o mesmo pagamento poderia cair no caixa de
+            // quem consultou o status primeiro. Removemos somente durante a
+            // chamada ao provedor e restauramos no finally, tornando webhook,
+            // retorno público e consulta administrativa determinísticos.
+            $session = session();
+            $usuarioSessao = $session->get('user_logged');
+            $session->forget('user_logged');
+
+            try {
+                $resultado = $callback($conta);
+            } finally {
+                if ($usuarioSessao !== null) {
+                    $session->put('user_logged', $usuarioSessao);
+                }
+            }
+
+            return response()->json($resultado);
         } catch (\Throwable $e) {
             report($e);
+
             return response()->json([
-                'erro' => $e->getMessage(),
-                'message' => $e->getMessage(),
+                'erro' => 'Não foi possível processar a operação do Mercado Pago.',
+                'message' => 'Não foi possível processar a operação do Mercado Pago.',
             ], 422);
         }
     }
