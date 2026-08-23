@@ -11,15 +11,14 @@ use App\Http\Controllers\VendaPixController;
 use App\Http\Controllers\BlingController;
 
 
-
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 |
 | Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
+| routes are loaded by the RouteServiceProvider within a group which is
+| assigned the "api" middleware group. Enjoy building your API!
 |
 */
 
@@ -147,9 +146,9 @@ Route::middleware(['hashEmpresa'])->group(function () {
     Route::get('/origemVendas', 'API\\GraficoController@origemVendas');
     Route::get('/opcao_deliveryMaisPedidos', 'API\\GraficoController@opcao_deliveryMaisPedidos');
     Route::get('/resumo_pedidosMaisPedidos', 'API\\GraficoController@resumo_pedidosMaisPedidos');
-    Route::get('/contasPagarCategorias', 'API\\GraficoController@contasPagarCategorias');
+    Route::get('/categoriasConta', 'API\\GraficoController@categoriasConta');
 
-    // **Fluxo anual no mesmo padr«ªo**
+    // **Fluxo anual no mesmo padrÂÂ«Âªo**
     Route::get('/fluxoAnual', 'API\\GraficoController@fluxoAnual');
 });
 
@@ -497,7 +496,7 @@ Route::group(['prefix' => 'pdv'], function(){
     Route::post('/teste', 'Pdv\\ConfigController@teste');
 
     Route::group(['prefix' => '/login'], function(){
-        Route::post('/', 'Pdv\\LoginController@login');
+        Route::post('/', 'Pdv\\LoginController@login')->middleware('throttle:10,1');
     });
 
     Route::group(['prefix' => '/produtos'], function(){
@@ -546,7 +545,6 @@ Route::group(['prefix' => '/marktplace'], function(){
     Route::get('/banners', 'MP\\LojaController@banners');
     Route::get('/cupons', 'MP\\LojaController@cupons');
     Route::get('/loja', 'MP\\LojaController@getLoja');
-    Route::get('/categorias', 'MP\\LojaController@categorias');
     Route::get('/categoriasDeProduto/{loja_id}', 'MP\\ProdutoController@categorias');
     Route::get('/adicionaisDeProduto', 'MP\\ProdutoController@adicionaisDeProduto');
     Route::post('/login', 'MP\\LoginController@login');
@@ -600,4 +598,3 @@ Route::group(['prefix' => '/controle_comandas'], function(){
     Route::get('/pedido/{id}', 'ControleComanda\\HomeController@pedido')->middleware('authAppComanda');
 
 });
-
