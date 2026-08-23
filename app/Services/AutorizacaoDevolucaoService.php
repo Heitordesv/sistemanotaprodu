@@ -57,18 +57,8 @@ class AutorizacaoDevolucaoService
     {
         $hash = (string) $administrador->senha;
 
-        // Senhas novas usam o hasher nativo (bcrypt/argon conforme configuração).
-        if ($hash !== '' && Hash::check($senha, $hash)) {
-            if (Hash::needsRehash($hash)) {
-                $administrador->senha = Hash::make($senha);
-                $administrador->save();
-            }
-
-            return true;
-        }
-
-        // Compatibilidade temporária com o legado MD5. No primeiro uso válido,
-        // migra automaticamente aquela credencial para um hash forte.
+        // Compatibilidade temporária com o legado MD5. Testamos o formato antes
+        // de chamar Hash::check para não submeter um hash antigo ao BcryptHasher.
         if (preg_match('/^[a-f0-9]{32}$/i', $hash) === 1) {
             $legadoValido = hash_equals(strtolower($hash), md5($senha));
 
@@ -78,6 +68,15 @@ class AutorizacaoDevolucaoService
             }
 
             return $legadoValido;
+        }
+
+        if ($hash !== '' && Hash::check($senha, $hash)) {
+            if (Hash::needsRehash($hash)) {
+                $administrador->senha = Hash::make($senha);
+                $administrador->save();
+            }
+
+            return true;
         }
 
         return false;
