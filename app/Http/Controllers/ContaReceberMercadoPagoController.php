@@ -159,25 +159,57 @@ class ContaReceberMercadoPagoController extends Controller
     {
         $secret = trim((string) ($config->mercadopago_webhook_secret ?? ''));
         if ($secret === '') {
+            // Compatibilidade com configurações antigas: mesmo sem secret, a
+            // conciliação ainda consulta o payment server-to-server com o Access
+            // Token da empresa e valida empresa/conta pela external_reference.
+            // O endpoint também possui rate limit. Novas configurações devem
+            // manter o secret preenchido para autenticação criptográfica adicional.
             return;
         }
 
-        // Compatível com versões novas do SDK oficial. Caso o projeto ainda use
-        // uma versão antiga, a segurança continua sendo garantida pela consulta
-        // server-to-server do payment usando o Access Token da própria empresa.
+        $xSignature = trim((string) $request->header('x-signature'));
+        $xRequestId = trim((string) $request->header('x-request-id'));
+
+        if ($xSignature === '' || $xRequestId === '') {
+            throw new RuntimeException('Webhook com assinatura ausente.');
+        }
+
+        // Usa o validador oficial quando a versão instalada do SDK o oferece.
         $validator = 'MercadoPago\\Webhook\\WebhookSignatureValidator';
-        if (!class_exists($validator)) {
-            return;
+        if (class_exists($validator)) {
+            try {
+                $validator::validate($xSignature, $xRequestId, $paymentId, $secret);
+                return;
+            } catch (\Throwable $e) {
+                throw new RuntimeException('Webhook com assinatura inválida.');
+            }
         }
 
-        try {
-            $validator::validate(
-                (string) $request->header('x-signature'),
-                (string) $request->header('x-request-id'),
-                $paymentId,
-                $secret
-            );
-        } catch (\Throwable $e) {
+        // Fallback compatível com o protocolo documentado pelo Mercado Pago:
+        // x-signature = ts=<timestamp>,v1=<hmac_sha256>
+        // manifest = id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+        $signatureParts = [];
+        foreach (explode(',', $xSignature) as $part) {
+            [$key, $value] = array_pad(explode('=', trim($part), 2), 2, null);
+            if ($key !== null && $value !== null) {
+                $signatureParts[trim($key)] = trim($value);
+            }
+        }
+
+        $timestamp = (string) ($signatureParts['ts'] ?? '');
+        $receivedHash = strtolower((string) ($signatureParts['v1'] ?? ''));
+
+        if ($timestamp === '' || $receivedHash === '' || !ctype_digit($timestamp)) {
+            throw new RuntimeException('Webhook com assinatura inválida.');
+        }
+
+        $manifest = 'id:' . strtolower($paymentId)
+            . ';request-id:' . $xRequestId
+            . ';ts:' . $timestamp . ';';
+
+        $calculatedHash = hash_hmac('sha256', $manifest, $secret);
+
+        if (!hash_equals($calculatedHash, $receivedHash)) {
             throw new RuntimeException('Webhook com assinatura inválida.');
         }
     }
