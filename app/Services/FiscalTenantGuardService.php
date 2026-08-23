@@ -10,6 +10,7 @@ use App\Models\Usuario;
 use App\Models\Venda;
 use App\Models\VendaCaixa;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
@@ -46,7 +47,7 @@ class FiscalTenantGuardService
 
     /**
      * Mantém o contrato de autenticação atual do AppFiscal, mas centraliza a
-     * derivação do tenant para que produto/configuração nunca confiem no
+     * derivação do tenant para que controllers fiscais nunca confiem no
      * empresa_id recebido no payload.
      */
     public function empresaIdPorTokenApp(Request $request): int
@@ -118,9 +119,59 @@ class FiscalTenantGuardService
         return $this->recurso(Produto::class, $empresaId, $id);
     }
 
+    /**
+     * Valida todos os produtos de uma operação em uma única query para evitar
+     * N+1 no boundary de tenant.
+     */
+    public function produtos(int $empresaId, array $ids): void
+    {
+        $ids = collect($ids)
+            ->filter(fn ($id) => is_scalar($id) && ctype_digit((string) $id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        $validos = Produto::query()
+            ->where('empresa_id', $empresaId)
+            ->whereIn('id', $ids->all())
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        if ($validos->count() !== $ids->count()) {
+            throw (new ModelNotFoundException())->setModel(Produto::class, $ids->all());
+        }
+    }
+
     public function configNota(int $empresaId, int $id): ConfigNota
     {
         return $this->recurso(ConfigNota::class, $empresaId, $id);
+    }
+
+    public function configNotaDaEmpresa(int $empresaId): ConfigNota
+    {
+        return ConfigNota::query()
+            ->where('empresa_id', $empresaId)
+            ->firstOrFail();
+    }
+
+    /**
+     * Garante que a natureza padrão gravada na configuração também pertence ao
+     * mesmo tenant. Isso impede referência cruzada mesmo em dados legados.
+     */
+    public function naturezaPadraoDaConfig(int $empresaId): ?NaturezaOperacao
+    {
+        $config = $this->configNotaDaEmpresa($empresaId);
+        $naturezaId = (int) $config->nat_op_padrao;
+
+        if ($naturezaId <= 0) {
+            return null;
+        }
+
+        return $this->natureza($empresaId, $naturezaId);
     }
 
     /**
