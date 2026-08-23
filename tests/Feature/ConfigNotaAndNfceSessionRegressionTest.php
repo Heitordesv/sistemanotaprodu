@@ -77,6 +77,22 @@ class ConfigNotaAndNfceSessionRegressionTest extends TestCase
             $this->assertStringContainsString($campo, $controller);
         }
     }
+
+    public function test_formulario_informa_csc_cadastrado_sem_expor_o_segredo(): void
+    {
+        $controller = (string) file_get_contents(
+            app_path('Http/Controllers/ConfigNotaController.php')
+        );
+        $formulario = (string) file_get_contents(
+            resource_path('views/config_nota/_forms.blade.php')
+        );
+
+        $this->assertStringContainsString("getRawOriginal('csc')", $controller);
+        $this->assertStringContainsString('CSC cadastrado.', $formulario);
+        $this->assertStringContainsString('type="password"', $formulario);
+        $this->assertStringContainsString('@if (!$cscCadastrado) required @endif', $formulario);
+        $this->assertStringNotContainsString('value="{{ $item->csc', $formulario);
+    }
 }
 
 class NfceSessionTestRoute
