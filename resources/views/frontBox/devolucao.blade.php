@@ -26,6 +26,17 @@
             )->orderBy('id', 'desc')->limit(100)->get()
             : collect();
     }
+
+    // Uma NFC-e pode estar cancelada na SEFAZ e ainda precisar concluir uma
+    // compensação financeira local. Mantemos essas operações visíveis para que
+    // o usuário possa retomá-las sem reenviar o evento fiscal.
+    $pendenciasDevolucao = \Illuminate\Support\Facades\Schema::hasTable('pdv_devolucoes')
+        ? \App\Models\PdvDevolucao::query()
+            ->where('empresa_id', $empresaDevolucaoId)
+            ->where('status', 'pendente_financeiro')
+            ->get(['id', 'venda_caixa_id', 'motivo', 'sefaz_mensagem'])
+            ->keyBy('venda_caixa_id')
+        : collect();
 @endphp
 <div class="page-content">
     <div class="card">
@@ -94,11 +105,19 @@
                     </thead>
                     <tbody>
                         @forelse ($data as $item)
+                        @php
+                            $devolucaoPendente = $pendenciasDevolucao->get((int) $item->id);
+                        @endphp
                         <tr>
                             <td>{{ $item->cliente->razao_social ?? 'Consumidor Final' }}</td>
                             <td>{{ __data_pt($item->created_at, 0) }}</td>
                             <td>{{ $item->getTipoPagamento($item->tipo_pagamento) }}</td>
-                            <td>{!! $item->estadoEmissao() !!}</td>
+                            <td>
+                                {!! $item->estadoEmissao() !!}
+                                @if ($devolucaoPendente)
+                                    <span class="badge bg-warning text-dark">Financeiro pendente</span>
+                                @endif
+                            </td>
                             <td>{{ $item->numero_nfce ?? '0' }}</td>
                             <td>{{ $item->usuario->nome }}</td>
                             <td>{{ __moeda($item->valor_total) }}</td>
@@ -112,8 +131,19 @@
                                     @csrf
                                     <input type="hidden" name="admin_id" class="devolucao-admin-id">
                                     <input type="hidden" name="admin_senha" class="devolucao-admin-senha">
+                                    <input type="hidden" name="motivo" class="devolucao-motivo">
 
-                                    @if ($item->estado_emissao == 'aprovado')
+                                    @if ($devolucaoPendente)
+                                    <button
+                                        type="button"
+                                        onclick="modalCancelar({{ $item->id }}, {{ $item->numero_nfce ?? 0 }})"
+                                        class="btn btn-warning btn-sm"
+                                        title="Retomar reconciliação financeira desta devolução"
+                                    >
+                                        <i class="bx bx-refresh"></i>
+                                    </button>
+                                    <small class="d-block text-warning mt-1">Retomar financeiro</small>
+                                    @elseif ($item->estado_emissao == 'aprovado')
                                     <button
                                         type="button"
                                         onclick="modalCancelar({{ $item->id }}, {{ $item->numero_nfce ?? 0 }})"
@@ -271,10 +301,48 @@
         return 'Não foi possível concluir a devolução.';
     }
 
-    function enviarDevolucaoNaoFiscal(formId, administradorId, senha) {
+    function pedirMotivoDevolucao(callback) {
+        swal({
+            title: 'Motivo da devolução',
+            text: 'Explique em poucas palavras por que a venda está sendo devolvida. Esta informação ficará registrada na auditoria.',
+            content: {
+                element: 'input',
+                attributes: {
+                    placeholder: 'Ex.: cliente devolveu o produto',
+                    maxlength: '255',
+                    autocomplete: 'off'
+                }
+            },
+            buttons: ['Voltar', 'Continuar'],
+            dangerMode: true
+        }).then(function (motivo) {
+            motivo = (motivo || '').trim();
+
+            if (!motivo) {
+                return;
+            }
+
+            if (motivo.length < 5) {
+                swal('Motivo obrigatório', 'Informe ao menos 5 caracteres para registrar a devolução.', 'warning');
+                return;
+            }
+
+            callback(motivo);
+        });
+    }
+
+    function enviarDevolucaoNaoFiscal(formId, administradorId, senha, motivo) {
+        if (!motivo) {
+            pedirMotivoDevolucao(function (motivoInformado) {
+                enviarDevolucaoNaoFiscal(formId, administradorId, senha, motivoInformado);
+            });
+            return;
+        }
+
         var form = $('#' + formId);
         form.find('.devolucao-admin-id').val(administradorId || '');
         form.find('.devolucao-admin-senha').val(senha || '');
+        form.find('.devolucao-motivo').val(motivo);
 
         var botao = $('.btn-devolver-venda[data-form="' + formId + '"]');
         botao.prop('disabled', true);
@@ -299,6 +367,7 @@
         .always(function () {
             botao.prop('disabled', false);
             form.find('.devolucao-admin-senha').val('');
+            form.find('.devolucao-motivo').val('');
             $('#devolucao_admin_senha').val('');
         });
     }
@@ -342,5 +411,5 @@
         enviarDevolucaoNaoFiscal(formId, administradorId, senha);
     });
 </script>
-<script type="text/javascript" src="/js/nfce.js?v=2"></script>
+<script type="text/javascript" src="/js/nfce.js?v=3"></script>
 @endsection
