@@ -255,21 +255,34 @@ class ContaReceberPagamentoService
             throw new ContaReceberPagamentoException('Empresa ou usuário da sessão inválido para registrar o recebimento.');
         }
 
-        $query = AberturaCaixa::query()
+        // Primeiro identifica a sessão candidata sem adquirir range/next-key lock.
+        // Em seguida bloqueia exatamente a PK da abertura. Isso mantém a mesma
+        // ordem global AberturaCaixa -> ContaReceber, mas evita deadlock com o
+        // fechamento ao alterar o índice usado por status/empresa/usuário.
+        $candidata = AberturaCaixa::query()
             ->where('empresa_id', $empresaSessao)
             ->where('usuario_id', $usuarioId)
-            ->where('status', 0);
+            ->where('status', 0)
+            ->when($filialId, fn ($query) => $query->where('filial_id', $filialId))
+            ->orderByDesc('id')
+            ->value('id');
 
-        if ($filialId) {
-            $query->where('filial_id', $filialId);
+        if (!$candidata) {
+            throw new ContaReceberPagamentoException('Nenhum caixa aberto foi encontrado. O caixa pode ter sido fechado por outra operação.');
         }
 
-        $abertura = $query
-            ->orderByDesc('id')
+        $abertura = AberturaCaixa::query()
+            ->whereKey((int) $candidata)
+            ->where('empresa_id', $empresaSessao)
+            ->where('usuario_id', $usuarioId)
             ->lockForUpdate()
             ->first();
 
-        if (!$abertura) {
+        if (
+            !$abertura
+            || (int) $abertura->status !== 0
+            || ($filialId && (int) $abertura->filial_id !== $filialId)
+        ) {
             throw new ContaReceberPagamentoException('Nenhum caixa aberto foi encontrado. O caixa pode ter sido fechado por outra operação.');
         }
 
