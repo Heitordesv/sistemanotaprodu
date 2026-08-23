@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - main
+      - agent/backend-senior
 
 jobs:
   financeiro:
@@ -86,6 +87,10 @@ jobs:
           vendor/bin/phpunit tests/Feature/VendaErroSeguroTest.php
           vendor/bin/phpunit tests/Feature/MercadoPagoConciliacaoDeterministicaTest.php
           vendor/bin/phpunit tests/Feature/PdvDevolucaoSeguraRoutesTest.php
+          vendor/bin/phpunit tests/Feature/PdvDevolucaoServiceTest.php
+          vendor/bin/phpunit tests/Feature/PdvDevolucaoFinanceiroServiceTest.php
+          vendor/bin/phpunit tests/Feature/PdvDevolucaoEstoqueFilialTest.php
+          vendor/bin/phpunit tests/Unit/NFCeConsultaCancelamentoParserTest.php
 
       - name: MySQL InnoDB concurrency and migration tests
         run: |
@@ -94,3 +99,4 @@ jobs:
           vendor/bin/phpunit tests/Integration/VendaCaixaEdicaoMysqlConcurrencyTest.php
           vendor/bin/phpunit tests/Integration/FinanceiroMigrationMysqlTest.php
           vendor/bin/phpunit tests/Integration/PdvDevolucaoMigrationMysqlTest.php
+          vendor/bin/phpunit tests/Integration/PdvDevolucaoMysqlConcurrencyTest.php
