@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AberturaCaixa;
 use App\Models\ContaReceber;
+use App\Models\PdvDevolucao;
 use App\Models\SangriaCaixa;
 use App\Models\SuprimentoCaixa;
 use App\Models\Usuario;
@@ -56,7 +57,8 @@ class CaixaResumoService
         $sangrias = $this->movimentacoesDaAbertura(SangriaCaixa::class, $abertura, $fim);
 
         $vendas = $this->agruparVendas($vendasNfe, $vendasPdv);
-        $somaTiposPagamento = $this->somarTiposPagamento($vendas);
+        $preservarCanceladas = $this->idsCanceladasDepoisDoFechamento($abertura);
+        $somaTiposPagamento = $this->somarTiposPagamento($vendas, $preservarCanceladas);
         $recebimentos = $this->recebimentosDaAbertura($abertura, $fim);
 
         $totalRecebimentos = round((float) $recebimentos->sum('valor'), 2);
@@ -291,16 +293,59 @@ class CaixaResumoService
         return $tipos;
     }
 
-    private function somarTiposPagamento(array $vendas): array
+    /**
+     * Um fechamento já realizado é fotografia financeira imutável. Se a venda foi
+     * devolvida DEPOIS do fechamento, ela continua compondo o caixa antigo e o
+     * reembolso aparece como sangria compensatória no caixa atual.
+     */
+    private function idsCanceladasDepoisDoFechamento(AberturaCaixa $abertura): array
+    {
+        if ((int) $abertura->status === 0 || !Schema::hasTable('pdv_devolucoes')) {
+            return [];
+        }
+
+        $fechadoEm = $abertura->updated_at ? Carbon::parse($abertura->updated_at) : null;
+        if (!$fechadoEm) {
+            return [];
+        }
+
+        return PdvDevolucao::query()
+            ->where('empresa_id', (int) $abertura->empresa_id)
+            ->where('abertura_caixa_original_id', (int) $abertura->id)
+            ->whereIn('status', ['concluida', 'pendente_financeiro'])
+            ->get(['venda_caixa_id', 'concluida_em', 'estoque_processado_em', 'updated_at'])
+            ->filter(function (PdvDevolucao $devolucao) use ($fechadoEm) {
+                $processadaEm = $devolucao->concluida_em
+                    ?: $devolucao->estoque_processado_em
+                    ?: $devolucao->updated_at;
+
+                return $processadaEm && Carbon::parse($processadaEm)->gt($fechadoEm);
+            })
+            ->pluck('venda_caixa_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function somarTiposPagamento(array $vendas, array $preservarCanceladas = []): array
     {
         $tipos = $this->prepararTipos();
+        $preservar = array_fill_keys($preservarCanceladas, true);
 
         foreach ($vendas as $venda) {
-            if (
+            $cancelada = (
                 strtoupper((string) ($venda->estado_emissao ?? '')) === 'CANCELADO'
                 || strtoupper((string) ($venda->estado ?? '')) === 'CANCELADO'
-            ) {
-                continue;
+            );
+
+            if ($cancelada) {
+                $ehPdvPreservado = $venda instanceof VendaCaixa
+                    && isset($preservar[(int) $venda->id]);
+
+                if (!$ehPdvPreservado) {
+                    continue;
+                }
             }
 
             if ((string) $venda->tipo_pagamento !== '99') {
