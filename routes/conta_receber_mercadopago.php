@@ -1,9 +1,14 @@
 <?php
 
 use App\Http\Controllers\ContaReceberMercadoPagoController;
+use App\Http\Middleware\AutorizaMercadoPagoFinanceiro;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('web')->group(function () {
+Route::middleware([
+    AutorizaMercadoPagoFinanceiro::class,
+    'verificaEmpresa',
+    'throttle:60,1',
+])->group(function () {
     Route::post('/conta_receber/mercadopago/pix/{id}', [ContaReceberMercadoPagoController::class, 'pix'])
         ->whereNumber('id')
         ->name('conta-receber.mp.pix');
@@ -36,5 +41,6 @@ Route::get('/pagamento/conta-receber/{id}/{token}', [ContaReceberMercadoPagoCont
     ->name('conta-receber.mp.retorno');
 
 Route::post('/webhooks/mercadopago/contas-receber/{configId}', [ContaReceberMercadoPagoController::class, 'webhook'])
+    ->middleware('throttle:120,1')
     ->whereNumber('configId')
     ->name('conta-receber.mp.webhook');
