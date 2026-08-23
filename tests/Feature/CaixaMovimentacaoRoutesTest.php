@@ -24,11 +24,13 @@ class CaixaMovimentacaoRoutesTest extends TestCase
     {
         $vendaStore = app('router')->getRoutes()->match(Request::create('/vendas', 'POST'));
         $vendaUpdate = app('router')->getRoutes()->match(Request::create('/vendas/10', 'PUT'));
+        $vendaDestroy = app('router')->getRoutes()->match(Request::create('/vendas/10', 'DELETE'));
         $pdvIndex = app('router')->getRoutes()->match(Request::create('/frenteCaixa', 'GET'));
         $pdvStore = app('router')->getRoutes()->match(Request::create('/frenteCaixa', 'POST'));
 
         $this->assertStringContainsString(VendaSeguraController::class, $vendaStore->getActionName());
         $this->assertStringContainsString(VendaSeguraController::class, $vendaUpdate->getActionName());
+        $this->assertStringContainsString(VendaSeguraController::class, $vendaDestroy->getActionName());
         $this->assertStringContainsString(FrontBoxResumoController::class, $pdvIndex->getActionName());
         $this->assertStringContainsString(FrontBoxResumoController::class, $pdvStore->getActionName());
     }
