@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Services\CaixaResumoService;
+use App\Services\VendaTenantGuardService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class FrontBoxResumoController extends FrontBoxController
 {
-    public function __construct(private CaixaResumoService $caixaResumoService)
-    {
+    public function __construct(
+        private CaixaResumoService $caixaResumoService,
+        private VendaTenantGuardService $tenantGuard
+    ) {
         parent::__construct();
     }
 
@@ -42,5 +45,14 @@ class FrontBoxResumoController extends FrontBoxController
         ]);
 
         return $response;
+    }
+
+    public function store(Request $request)
+    {
+        // Antes de qualquer ItemVendaCaixa/StockMove, garante que produtos,
+        // cliente e filial pertencem ao tenant autenticado.
+        $this->tenantGuard->validar($request);
+
+        return parent::store($request);
     }
 }
