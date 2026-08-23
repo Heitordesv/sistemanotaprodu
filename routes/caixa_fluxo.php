@@ -53,7 +53,14 @@ Route::middleware(array_merge($financeMiddlewares, ['caixaMovimento:venda-opcion
 // O resource legado registra PUT/PATCH /vendas/{venda}. Usar exatamente o
 // mesmo padrão aqui faz esta rota, carregada depois de web.php, substituir a
 // definição insegura em vez de criar uma segunda rota dinâmica concorrente.
-// O vínculo abertura_caixa_id permanece imutável no controller seguro.
+// A edição é executada sob lock da AberturaCaixa vinculada à venda; caixa
+// fechado torna a venda financeiramente imutável.
 Route::middleware($financeMiddlewares)
     ->match(['put', 'patch'], '/vendas/{venda}', [VendaSeguraController::class, 'update'])
     ->name('vendas.update');
+
+// Exclusão altera o mesmo resultado financeiro de uma edição. Portanto também
+// disputa o lock da abertura e é recusada quando a sessão já foi encerrada.
+Route::middleware($financeMiddlewares)
+    ->delete('/vendas/{venda}', [VendaSeguraController::class, 'destroy'])
+    ->name('vendas.destroy');
