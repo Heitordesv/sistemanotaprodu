@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\ContaReceberMercadoPagoController;
 use App\Models\ContaReceber;
 use App\Services\ContaReceberMercadoPagoService;
+use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -122,8 +123,6 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
 
     public function test_aprovacao_tardia_nao_deixa_valor_recebido_ultrapassar_valor_integral(): void
     {
-        // Sem sessão durante conciliação automática: evita resolução de caixa e
-        // reproduz o comportamento do webhook/retorno público.
         session()->forget('user_logged');
 
         $conta = ContaReceber::findOrFail(10);
@@ -165,7 +164,7 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
         $this->assertSame('01', (string) $conta->tipo_pagamento);
         $this->assertSame(
             $dataOriginal->format('Y-m-d H:i:s'),
-            optional($conta->data_recebimento)->format('Y-m-d H:i:s')
+            Carbon::parse((string) $conta->data_recebimento)->format('Y-m-d H:i:s')
         );
     }
 }
