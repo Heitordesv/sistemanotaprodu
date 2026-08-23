@@ -71,13 +71,35 @@ class PdvTotalServiceTest extends TestCase
         ], 10);
     }
 
-    public function test_bloqueia_percentual_acima_de_cem(): void
+    public function test_bloqueia_desconto_percentual_acima_de_cem(): void
     {
         $this->expectException(ValidationException::class);
 
         $this->service->calcular(100, [
+            'desconto_tipo' => 'percentual',
+            'desconto_valor' => 101,
+        ]);
+    }
+
+    public function test_permite_acrescimo_percentual_acima_de_cem(): void
+    {
+        $resultado = $this->service->calcular(100, [
             'acrescimo_tipo' => 'percentual',
-            'acrescimo_valor' => 101,
+            'acrescimo_valor' => 150,
+        ]);
+
+        $this->assertSame(150.0, $resultado['acrescimo']);
+        $this->assertSame(250.0, $resultado['valor_total']);
+    }
+
+    public function test_bloqueia_desconto_fixo_maior_que_os_produtos(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $this->service->calcular(100, [
+            'desconto_tipo' => 'fixo',
+            'desconto_valor' => 101,
+            'taxa_entrega' => 20,
         ]);
     }
 }

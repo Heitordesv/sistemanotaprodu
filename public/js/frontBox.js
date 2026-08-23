@@ -411,7 +411,7 @@ function escolherTipoAjuste(titulo, callback) {
     });
 }
 
-function solicitarValorAjuste(titulo, tipo, callback) {
+function solicitarValorAjuste(titulo, tipo, limitePercentual, callback) {
     swal({
         title: titulo,
         text: tipo === 'percentual'
@@ -425,11 +425,12 @@ function solicitarValorAjuste(titulo, tipo, callback) {
         }
 
         var numero = normalizarNumeroPdv(valor);
-        if (numero < 0 || (tipo === 'percentual' && numero > 100)) {
+        var limite = limitePercentual || 1000;
+        if (numero < 0 || (tipo === 'percentual' && numero > limite)) {
             swal(
                 'Valor inválido',
                 tipo === 'percentual'
-                    ? 'A porcentagem deve ficar entre 0% e 100%.'
+                    ? 'A porcentagem deve ficar entre 0% e ' + limite + '%.'
                     : 'Informe um valor igual ou maior que zero.',
                 'warning'
             );
@@ -449,7 +450,7 @@ function setaDesconto() {
     }
 
     escolherTipoAjuste('Aplicar desconto', function (tipo) {
-        solicitarValorAjuste('Valor do desconto', tipo, function (valor) {
+        solicitarValorAjuste('Valor do desconto', tipo, 100, function (valor) {
             var limite = normalizarNumeroPdv($('#percentual_max_desconto').val());
             var percentualEquivalente = tipo === 'percentual'
                 ? valor
@@ -478,7 +479,7 @@ function setaAcrescimo() {
     }
 
     escolherTipoAjuste('Aplicar acréscimo', function (tipo) {
-        solicitarValorAjuste('Valor do acréscimo', tipo, function (valor) {
+        solicitarValorAjuste('Valor do acréscimo', tipo, 1000, function (valor) {
             ACRESCIMO_TIPO = tipo;
             ACRESCIMO_VALOR_INFORMADO = valor;
         });
@@ -491,7 +492,7 @@ function setaTaxaEntrega() {
         return;
     }
 
-    solicitarValorAjuste('Taxa de entrega', 'fixo', function (valor) {
+    solicitarValorAjuste('Taxa de entrega', 'fixo', null, function (valor) {
         TAXA_ENTREGA = valor;
     });
 }

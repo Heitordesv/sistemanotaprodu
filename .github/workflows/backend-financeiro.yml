@@ -77,6 +77,9 @@ jobs:
           vendor/bin/phpunit tests/Feature/FiscalTenantGuardTest.php
           vendor/bin/phpunit tests/Feature/FiscalTenantGuardDatabaseTest.php
 
+      - name: PDV delivery fee and adjustment tests
+        run: vendor/bin/phpunit tests/Unit/PdvTotalServiceTest.php
+
       - name: Feature tests do fluxo financeiro
         run: |
           vendor/bin/phpunit tests/Feature/CaixaRecebimentosTest.php

@@ -39,6 +39,14 @@ class PdvTotalService
             'acrescimo'
         );
 
+        if ($desconto > $valorItens + 0.001) {
+            throw ValidationException::withMessages([
+                'desconto' => [
+                    'O desconto não pode ser maior que o subtotal dos produtos.',
+                ],
+            ]);
+        }
+
         $taxaEntrega = round(max(0, $this->numero($dados['taxa_entrega'] ?? 0)), 2);
 
         if ($percentualMaximoDesconto > 0) {
@@ -93,9 +101,15 @@ class PdvTotalService
     ): float {
         $entrada = max(0, $entrada);
 
-        if ($tipo === 'percentual' && $entrada > 100) {
+        $limitePercentual = $campo === 'desconto' ? 100 : 1000;
+
+        if ($tipo === 'percentual' && $entrada > $limitePercentual) {
             throw ValidationException::withMessages([
-                $campo => ['A porcentagem deve ficar entre 0% e 100%.'],
+                $campo => [
+                    'A porcentagem deve ficar entre 0% e ' .
+                    $limitePercentual .
+                    '%.',
+                ],
             ]);
         }
 
