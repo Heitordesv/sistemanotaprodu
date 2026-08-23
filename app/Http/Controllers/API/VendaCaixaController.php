@@ -18,6 +18,7 @@ use App\Models\Produto;
 use App\Models\VendaCaixa;
 use App\Models\VendaCaixaPreVenda;
 use App\Services\LimiteCreditoClienteService;
+use App\Services\PdvTotalService;
 use Carbon\Carbon;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -32,7 +33,11 @@ class VendaCaixaController extends Controller
     private const TIPO_PAGAMENTO_CREDIARIO = '06';
     private const TIPO_PAGAMENTO_PIX_QRCODE = '19';
 
-    public function store(Request $request, LimiteCreditoClienteService $creditoService)
+    public function store(
+        Request $request,
+        LimiteCreditoClienteService $creditoService,
+        PdvTotalService $totalService
+    )
     {
         $empresaId = (int) $request->empresa_id;
         $lock = null;
@@ -54,6 +59,11 @@ class VendaCaixaController extends Controller
                 'valor_unitario.*' => 'required',
                 'pix_payment_id' => 'nullable|string|max:64',
                 'pix_valor' => 'nullable|numeric|min:0.01',
+                'desconto_tipo' => 'nullable|in:fixo,percentual',
+                'acrescimo_tipo' => 'nullable|in:fixo,percentual',
+                'desconto_valor' => 'nullable',
+                'acrescimo_valor' => 'nullable',
+                'taxa_entrega' => 'nullable',
             ]);
 
             $empresaId = (int) $request->empresa_id;
@@ -67,7 +77,7 @@ class VendaCaixaController extends Controller
 
             if (!$lock->get()) {
                 return response()->json([
-                    'message' => 'Esta venda já está sendo processada. Aguarde a confirmação.',
+                    'message' => 'Esta venda j篓垄 est篓垄 sendo processada. Aguarde a confirma聛0艩4聛0艩0o.',
                     'code' => 'pdv_em_processamento',
                 ], 409);
             }
@@ -82,23 +92,26 @@ class VendaCaixaController extends Controller
 
             if (!$empresa->configNota || !$empresa->configNota->natureza) {
                 $this->bloquearVenda(
-                    'A configuração fiscal padrão da empresa está incompleta.',
-                    ['empresa_id' => ['Configure a natureza de operação padrão antes de vender.']]
+                    'A configura聛0艩4聛0艩0o fiscal padr聛0艩0o da empresa est篓垄 incompleta.',
+                    ['empresa_id' => ['Configure a natureza de opera聛0艩4聛0艩0o padr聛0艩0o antes de vender.']]
                 );
             }
 
-            $vendaCaixa = DB::transaction(function () use ($request, $creditoService, $empresa) {
+            $vendaCaixa = DB::transaction(function () use (
+                $request,
+                $creditoService,
+                $totalService,
+                $empresa
+            ) {
                 $valorItens = $this->somaItens($request, (int) $empresa->id);
-                $desconto = max(0, $this->moedaParaFloat($request->desconto));
-                $acrescimo = max(0, $this->moedaParaFloat($request->acrescimo));
-                $valorTotal = round($valorItens + $acrescimo - $desconto, 2);
-
-                if ($valorTotal < 0) {
-                    $this->bloquearVenda(
-                        'O desconto não pode ser maior que o valor dos produtos.',
-                        ['desconto' => ['Revise o desconto informado.']]
-                    );
-                }
+                $ajustes = $totalService->calcular(
+                    $valorItens,
+                    $request->all(),
+                    (float) ($empresa->configNota->percentual_max_desconto ?? 0)
+                );
+                $desconto = $ajustes['desconto'];
+                $acrescimo = $ajustes['acrescimo'];
+                $valorTotal = $ajustes['valor_total'];
 
                 $this->validarPagamentos($request, $valorTotal);
                 $creditoService->validarVendaPdv($request, $valorTotal);
@@ -121,11 +134,16 @@ class VendaCaixaController extends Controller
                     'peso_liquido' => $request->peso_liquido ?? 0,
                     'peso_bruto' => $request->peso_bruto ?? 0,
                     'desconto' => $desconto,
+                    'desconto_tipo' => $ajustes['desconto_tipo'],
+                    'desconto_percentual' => $ajustes['desconto_percentual'],
                     'valor_total' => $valorTotal,
                     'estado_emissao' => 'novo',
                     'sequencia_cce' => $request->sequencia_cce ?? 0,
                     'chave' => $request->chave ?? 0,
                     'acrescimo' => $acrescimo,
+                    'acrescimo_tipo' => $ajustes['acrescimo_tipo'],
+                    'acrescimo_percentual' => $ajustes['acrescimo_percentual'],
+                    'taxa_entrega' => $ajustes['taxa_entrega'],
                     'natureza_id' => $empresa->configNota->nat_op_padrao,
                     'dinheiro_recebido' => $request->valor_recebido
                         ? $this->moedaParaFloat($request->valor_recebido)
@@ -213,7 +231,7 @@ class VendaCaixaController extends Controller
             return $this->respostaVenda($vendaCaixa);
         } catch (ValidationException $e) {
             return response()->json([
-                'message' => 'Existem dados inválidos ou incompletos na venda.',
+                'message' => 'Existem dados inv篓垄lidos ou incompletos na venda.',
                 'errors' => $this->normalizarUtf8($e->errors()),
                 'code' => 'validacao_pdv',
             ], 422, [], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
@@ -246,8 +264,8 @@ class VendaCaixaController extends Controller
     }
 
     /**
-     * Serializa a venda sem transformar bytes legados inválidos em erro de checkout.
-     * A venda já foi confirmada neste ponto; a resposta nunca deve fazê-la parecer recusada.
+     * Serializa a venda sem transformar bytes legados inv篓垄lidos em erro de checkout.
+     * A venda j篓垄 foi confirmada neste ponto; a resposta nunca deve faz篓潞-la parecer recusada.
      */
     private function respostaVenda(VendaCaixa $vendaCaixa)
     {
@@ -289,7 +307,7 @@ class VendaCaixaController extends Controller
             count($produtos) !== count($valores)
         ) {
             $this->bloquearVenda(
-                'Os dados dos produtos estão incompletos.',
+                'Os dados dos produtos est聛0艩0o incompletos.',
                 ['produto_id' => ['Revise os itens da venda.']]
             );
         }
@@ -306,8 +324,8 @@ class VendaCaixaController extends Controller
 
             if (!$produtoExiste || $quantidade <= 0 || $valorUnitario < 0) {
                 $this->bloquearVenda(
-                    'Um dos produtos possui dados inválidos.',
-                    ["produto_id.{$indice}" => ['Produto, quantidade ou valor inválido.']]
+                    'Um dos produtos possui dados inv篓垄lidos.',
+                    ["produto_id.{$indice}" => ['Produto, quantidade ou valor inv篓垄lido.']]
                 );
             }
 
@@ -326,7 +344,7 @@ class VendaCaixaController extends Controller
         if ($tipos !== []) {
             if (count($tipos) !== count($valores)) {
                 $this->bloquearVenda(
-                    'As linhas de pagamento estão incompletas.',
+                    'As linhas de pagamento est聛0艩0o incompletas.',
                     ['tipo_pagamento_row' => ['Revise os pagamentos adicionados.']]
                 );
             }
@@ -339,8 +357,8 @@ class VendaCaixaController extends Controller
 
                 if (!array_key_exists($tipo, VendaCaixa::tiposPagamento()) || $valor <= 0) {
                     $this->bloquearVenda(
-                        'Existe uma forma de pagamento inválida.',
-                        ["tipo_pagamento_row.{$indice}" => ['Tipo ou valor inválido.']]
+                        'Existe uma forma de pagamento inv篓垄lida.',
+                        ["tipo_pagamento_row.{$indice}" => ['Tipo ou valor inv篓垄lido.']]
                     );
                 }
 
@@ -356,8 +374,8 @@ class VendaCaixaController extends Controller
                     empty($vencimentos[$indice])
                 ) {
                     $this->bloquearVenda(
-                        'Informe o vencimento de todas as parcelas do crediário.',
-                        ["data_vencimento_row.{$indice}" => ['Vencimento obrigatório.']]
+                        'Informe o vencimento de todas as parcelas do credi篓垄rio.',
+                        ["data_vencimento_row.{$indice}" => ['Vencimento obrigat篓庐rio.']]
                     );
                 }
 
@@ -381,8 +399,8 @@ class VendaCaixaController extends Controller
 
         if ($tipo === '' || !array_key_exists($tipo, VendaCaixa::tiposPagamento())) {
             $this->bloquearVenda(
-                'Selecione uma forma de pagamento válida.',
-                ['tipo_pagamento' => ['Forma de pagamento obrigatória.']]
+                'Selecione uma forma de pagamento v篓垄lida.',
+                ['tipo_pagamento' => ['Forma de pagamento obrigat篓庐ria.']]
             );
         }
 
@@ -391,7 +409,7 @@ class VendaCaixaController extends Controller
             $this->moedaParaFloat($request->valor_recebido) + 0.009 < $valorTotal
         ) {
             $this->bloquearVenda(
-                'O valor recebido é menor que o total da venda.',
+                'O valor recebido 篓娄 menor que o total da venda.',
                 ['valor_recebido' => ['Informe um valor suficiente.']]
             );
         }
@@ -424,8 +442,8 @@ class VendaCaixaController extends Controller
             empty($request->data_vencimento)
         ) {
             $this->bloquearVenda(
-                'Informe o primeiro vencimento do crediário.',
-                ['data_vencimento' => ['Vencimento obrigatório.']]
+                'Informe o primeiro vencimento do credi篓垄rio.',
+                ['data_vencimento' => ['Vencimento obrigat篓庐rio.']]
             );
         }
     }
@@ -453,8 +471,8 @@ class VendaCaixaController extends Controller
 
         if (!$categoria) {
             $this->bloquearVenda(
-                'Cadastre uma categoria de contas a receber antes de usar o crediário.',
-                ['categoria_id' => ['Categoria de contas a receber não encontrada.']]
+                'Cadastre uma categoria de contas a receber antes de usar o credi篓垄rio.',
+                ['categoria_id' => ['Categoria de contas a receber n聛0艩0o encontrada.']]
             );
         }
 
@@ -474,8 +492,8 @@ class VendaCaixaController extends Controller
 
         if (!$vendedor) {
             $this->bloquearVenda(
-                'O vendedor selecionado não pertence a esta empresa.',
-                ['vendedor_id' => ['Vendedor inválido.']]
+                'O vendedor selecionado n聛0艩0o pertence a esta empresa.',
+                ['vendedor_id' => ['Vendedor inv篓垄lido.']]
             );
         }
 
@@ -537,7 +555,7 @@ class VendaCaixaController extends Controller
                 $categoria,
                 Carbon::parse($request->data_vencimento_row[$indice]),
                 $this->moedaParaFloat($request->valor_integral_row[$indice]),
-                'Linha de crediário ' . ($indice + 1),
+                'Linha de credi篓垄rio ' . ($indice + 1),
                 $request->obs_row[$indice] ?? ''
             );
         }
@@ -560,7 +578,7 @@ class VendaCaixaController extends Controller
             'valor_integral' => $valor,
             'valor_recebido' => 0,
             'status' => 0,
-            'referencia' => $referencia . ' da compra código ' . $vendaCaixa->id,
+            'referencia' => $referencia . ' da compra c篓庐digo ' . $vendaCaixa->id,
             'categoria_id' => optional($categoria)->id,
             'empresa_id' => $request->empresa_id,
             'juros' => 0,

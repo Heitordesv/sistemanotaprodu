@@ -65,7 +65,35 @@
                     </tbody>
                 </table>
             </div>
-            <h5 class="mt-3">Soma total: <strong style="color: rgb(20, 60, 241)">{{ __moeda($somaItens) }}</strong></h5>
+            <div class="mt-3">
+                <h6>Subtotal dos produtos: <strong>{{ __moeda($somaItens) }}</strong></h6>
+                @if(($item->taxa_entrega ?? 0) > 0)
+                    <h6>Taxa de entrega: <strong>+ R$ {{ __moeda($item->taxa_entrega) }}</strong></h6>
+                @endif
+                @if($item->acrescimo > 0)
+                    <h6>
+                        Acréscimo:
+                        <strong>
+                            + R$ {{ __moeda($item->acrescimo) }}
+                            @if($item->acrescimo_tipo === 'percentual')
+                                ({{ __moeda($item->acrescimo_percentual) }}%)
+                            @endif
+                        </strong>
+                    </h6>
+                @endif
+                @if($item->desconto > 0)
+                    <h6>
+                        Desconto:
+                        <strong>
+                            - R$ {{ __moeda($item->desconto) }}
+                            @if($item->desconto_tipo === 'percentual')
+                                ({{ __moeda($item->desconto_percentual) }}%)
+                            @endif
+                        </strong>
+                    </h6>
+                @endif
+                <h5>Total da venda: <strong style="color: rgb(20, 60, 241)">R$ {{ __moeda($item->valor_total) }}</strong></h5>
+            </div>
             <hr>
             <div class="col-5">
                 @if($item->NFcNumero && $item->estado == 'APROVADO')

@@ -458,7 +458,7 @@
 
         .pdv-adjustments {
             display: grid;
-            grid-template-columns: 1fr 1fr minmax(240px, 1.3fr);
+            grid-template-columns: 1fr 1fr 1fr minmax(220px, 1.25fr);
             gap: 8px;
             margin-top: 9px;
         }
@@ -737,7 +737,7 @@
             .pdv-command-button { padding: 8px 9px; font-size: .67rem; }
             .pdv-layout { grid-template-columns: minmax(0, 1fr) 350px; gap: 8px; margin-top: 8px; }
             .pdv-product-form { grid-template-columns: minmax(220px, 1fr) 105px 130px auto; gap: 7px; }
-            .pdv-adjustments { grid-template-columns: 1fr 1fr minmax(215px, 1.2fr); gap: 7px; }
+            .pdv-adjustments { grid-template-columns: 1fr 1fr; gap: 7px; }
         }
 
         @media (max-width: 1100px) {
@@ -751,7 +751,7 @@
             .pdv-layout { display: flex; flex-direction: column; }
             .pdv-checkout { position: static; width: 100%; }
             .pdv-items-scroll { height: 340px; }
-            .pdv-adjustments { grid-template-columns: 1fr 1fr 1.3fr; }
+            .pdv-adjustments { grid-template-columns: 1fr 1fr; }
         }
 
         @media (max-width: 767.98px) {

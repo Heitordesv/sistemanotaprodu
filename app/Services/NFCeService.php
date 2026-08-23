@@ -194,9 +194,16 @@ public function gerarNFCe($venda){
 
 		//PRODUTOS
 		$itemCont = 0;
-		$somaDesconto = 0;
 		$totalItens = count($venda->itens);
-		$somaAcrescimo = 0;
+		$taxaEntrega = (float) ($venda->taxa_entrega ?? 0);
+		$rateioAjustes = (new NFCeItemAdjustmentRateioService())->ratear(
+			$venda->itens->map(function ($item) {
+				return (float) $item->quantidade * (float) $item->valor;
+			})->values()->all(),
+			(float) $venda->desconto,
+			(float) $venda->acrescimo,
+			$taxaEntrega
+		);
 		$VBC = 0;
 
 		$somaFederal = 0;
@@ -261,70 +268,35 @@ public function gerarNFCe($venda){
 			$stdProd->vUnTrib = $this->format($i->valor, $config->casas_decimais);
 			$stdProd->indTot = 1;
 
-			//calculo media prod
-			if($venda->acrescimo > 0){
-				if($itemCont < sizeof($venda->itens)){
-					$totalVenda = $venda->valor_total;
+			$ajusteFiscalItem = $rateioAjustes[$itemCont - 1];
 
-					$media = (((($stdProd->vProd-$totalVenda)/$totalVenda))*100);
-					$media = 100 - ($media * -1);
-
-					$tempAcrescimo = ($venda->acrescimo*$media)/100;
-					$somaAcrescimo+=$tempAcrescimo;
-					if($tempAcrescimo > 0.1)
-						$stdProd->vOutro = $this->format($tempAcrescimo);
-				}else{
-					if($venda->acrescimo - $somaAcrescimo > 0.1)
-						$stdProd->vOutro = $this->format($venda->acrescimo - $somaAcrescimo);
-				}
+			if($ajusteFiscalItem['frete'] > 0){
+				$stdProd->vFrete = $this->format($ajusteFiscalItem['frete']);
 			}
 
-			if($venda->pedido_delivery_id > 0){
+			if($ajusteFiscalItem['acrescimo'] > 0){
+				$stdProd->vOutro = $this->format($ajusteFiscalItem['acrescimo']);
+			}
+
+			if($ajusteFiscalItem['desconto'] > 0){
+				$stdProd->vDesc = $this->format($ajusteFiscalItem['desconto']);
+			}
+
+			// Pedidos delivery antigos não persistiam a taxa separadamente.
+			// Mantém o fallback legado somente quando não há ajustes explícitos novos.
+			if(
+				$venda->pedido_delivery_id > 0 &&
+				$taxaEntrega <= 0 &&
+				(float) $venda->acrescimo <= 0
+			){
 				$pedido = PedidoDelivery::find($venda->pedido_delivery_id);
 				$somaItens = $pedido->somaItensSemFrete();
 				$totalVenda = $venda->valor_total;
 				if($somaItens < $totalVenda){
 					$vAcr = $totalVenda - $somaItens;
-
-					if($itemCont < sizeof($venda->itens)){
-						$media = (((($stdProd->vProd-$totalVenda)/$totalVenda))*100);
-						$media = 100 - ($media * -1);
-
-						$tempAcrescimo = ($vAcr*$media)/100;
-						$somaAcrescimo+=$tempAcrescimo;
-						if($tempAcrescimo > 0.1)
-							$stdProd->vOutro = $this->format($tempAcrescimo);
-					}else{
-						if($vAcr - $somaAcrescimo > 0.1)
-							$stdProd->vOutro = $this->format($vAcr - $somaAcrescimo);
-					}
-				}
-			}
-
-			if($venda->desconto > 0){
-				if($itemCont < sizeof($venda->itens)){
-					$totalVenda = $venda->valor_total + $venda->desconto;
-
-					$media = (((($stdProd->vProd - $totalVenda)/$totalVenda))*100);
-					$media = 100 - ($media * -1);
-
-					if($venda->desconto > 0.1){
-						$tempDesc = ($venda->desconto*$media)/100;
-					}else{
-						$tempDesc = $venda->desconto;
-					}
-
-					if($somaDesconto >= $venda->desconto){
-						$tempDesc = 0;
-					}
-
-					$somaDesconto += $tempDesc;
-
-					if($tempDesc > 0.01)
-						$stdProd->vDesc = $this->format($tempDesc);
-				}else{
-					if($venda->desconto - $somaDesconto >= 0.01)
-						$stdProd->vDesc = $this->format($venda->desconto - $somaDesconto);
+					$stdProd->vOutro = $this->format(
+						$vAcr * (($i->quantidade * $i->valor) / max($somaItens, 0.01))
+					);
 				}
 			}
 
@@ -460,7 +432,7 @@ public function gerarNFCe($venda){
 		$stdICMSTot->vBCST = 0.00;
 		$stdICMSTot->vST = 0.00;
 		$stdICMSTot->vProd = $this->format($somaProdutos);
-		$stdICMSTot->vFrete = 0.00;
+		$stdICMSTot->vFrete = $this->format($taxaEntrega);
 		$stdICMSTot->vSeg = 0.00;
 		$stdICMSTot->vDesc = $this->format($venda->desconto);
 		$stdICMSTot->vII = 0.00;

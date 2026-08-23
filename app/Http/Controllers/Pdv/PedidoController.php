@@ -3,24 +3,25 @@
 namespace App\Http\Controllers\Pdv;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\AuthPdv;
 use Illuminate\Http\Request;
 use App\Models\ImpressaoPedido;
 
 class PedidoController extends Controller
 {
     public function index(Request $request){
+        $empresaId = (int) $request->attributes->get(AuthPdv::EMPRESA_ID_ATTRIBUTE);
+
         $data = ImpressaoPedido::
-        where('empresa_id', $request->empresa_id)
+        where('empresa_id', $empresaId)
         ->where('status', 0)
         ->limit(15)
         ->get();
-        // return response()->json($data, 200);
 
         $itens = [];
         
         if(sizeof($data) > 0){
             $pedidoId = $data[0]->pedido_id;
-            // return $pedidoId;
             foreach($data as $item){
 
                 if($item->pedido_id == $pedidoId){
@@ -36,12 +37,21 @@ class PedidoController extends Controller
 
     public function setImpresso(Request $request){
         try{
-            ImpressaoPedido::where('pedido_id', $request->pedido_id)
-            ->update(['status' => 1]);
+            $empresaId = (int) $request->attributes->get(AuthPdv::EMPRESA_ID_ATTRIBUTE);
+
+            $updated = ImpressaoPedido::query()
+                ->where('empresa_id', $empresaId)
+                ->where('pedido_id', $request->pedido_id)
+                ->update(['status' => 1]);
+
+            if ($updated === 0) {
+                return response()->json('Pedido não encontrado', 404);
+            }
+
             return response()->json("ok", 200);
 
         }catch(\Exception $e){
-            return response()->json($e->getMessage(), 401);
+            return response()->json('Não foi possível atualizar o pedido.', 500);
         }
     }
 }

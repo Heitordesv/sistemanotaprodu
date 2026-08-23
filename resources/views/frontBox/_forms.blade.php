@@ -355,6 +355,15 @@
                     <i class="bx bx-edit pdv-adjustment-edit"></i>
                 </button>
 
+                <button type="button" onclick="setaTaxaEntrega()" class="pdv-adjustment-card btn-taxa-entrega">
+                    <span class="pdv-adjustment-icon"><i class="bx bx-cycling"></i></span>
+                    <span class="pdv-adjustment-copy">
+                        <small>Taxa de entrega</small>
+                        <strong id="valor_taxa_entrega">R$ 0,00</strong>
+                    </span>
+                    <i class="bx bx-edit pdv-adjustment-edit"></i>
+                </button>
+
                 <div class="pdv-price-list">
                     <label for="lista-precos-pdv">Lista de preços</label>
                     <select id="lista-precos-pdv" class="form-select" aria-label="Lista de preços">

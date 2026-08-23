@@ -11,7 +11,8 @@ class VendaCaixa extends Model
 		'cliente_id', 'usuario_id', 'valor_total', 'numero_nfce',
 		'natureza_id', 'chave', 'estado_emissao', 'tipo_pagamento', 'forma_pagamento',
 		'dinheiro_recebido', 'troco', 'nome', 'cpf', 'observacao', 'desconto', 'acrescimo',
-		'pedido_delivery_id', 'empresa_id', 'bandeira_cartao',
+		'desconto_tipo', 'desconto_percentual', 'acrescimo_tipo', 'acrescimo_percentual',
+		'taxa_entrega', 'pedido_delivery_id', 'empresa_id', 'bandeira_cartao',
 		'cnpj_cartao', 'cAut_cartao', 'descricao_pag_outros', 'rascunho', 'consignado', 'pdv_java',
 		'retorno_estoque', 'qr_code_base64', 'filial_id', 'abertura_caixa_id'
 	];

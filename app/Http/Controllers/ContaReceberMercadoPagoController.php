@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ConfigEcommerce;
 use App\Models\ContaReceber;
+use App\Services\ContaReceberMercadoPagoDirectChargeService;
 use App\Services\ContaReceberMercadoPagoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -11,18 +12,20 @@ use RuntimeException;
 
 class ContaReceberMercadoPagoController extends Controller
 {
-    public function __construct(private ContaReceberMercadoPagoService $service)
-    {
+    public function __construct(
+        private ContaReceberMercadoPagoService $service,
+        private ContaReceberMercadoPagoDirectChargeService $directChargeService
+    ) {
     }
 
     public function pix(int $id)
     {
-        return $this->executarAdmin($id, fn ($conta) => $this->service->gerarPix($conta));
+        return $this->executarAdmin($id, fn ($conta) => $this->directChargeService->gerarPix($conta));
     }
 
     public function boleto(int $id)
     {
-        return $this->executarAdmin($id, fn ($conta) => $this->service->gerarBoleto($conta));
+        return $this->executarAdmin($id, fn ($conta) => $this->directChargeService->gerarBoleto($conta));
     }
 
     public function cartao(int $id)
@@ -85,26 +88,49 @@ class ContaReceberMercadoPagoController extends Controller
                 'message' => $e->getMessage(),
             ]);
 
-            // Se a assinatura for inválida, retorna 401. Nos demais erros, 200 evita loop
-            // de reentregas enquanto o detalhe fica registrado em log para correção.
             if ($e instanceof RuntimeException && str_contains($e->getMessage(), 'assinatura')) {
                 return response()->json(['ok' => false], 401);
             }
 
-            return response()->json(['ok' => true], 200);
+            // Não confirma um evento financeiro que não foi persistido. O 503
+            // permite que o provedor reentregue a notificação depois de uma falha
+            // temporária de banco, rede ou API.
+            return response()->json(['ok' => false], 503);
         }
     }
 
     private function executarAdmin(int $id, callable $callback)
     {
         try {
+            // Primeiro resolve a conta usando a sessão autenticada/tenant atual.
             $conta = $this->contaDaEmpresa($id);
-            return response()->json($callback($conta));
+
+            // A aprovação do Mercado Pago é um recebimento automático externo,
+            // e não uma operação física de um caixa. O observer legado de
+            // ContaReceber usa user_logged para descobrir o caixa; se a sessão
+            // permanecesse ativa, o mesmo pagamento poderia cair no caixa de
+            // quem consultou o status primeiro. Removemos somente durante a
+            // chamada ao provedor e restauramos no finally, tornando webhook,
+            // retorno público e consulta administrativa determinísticos.
+            $session = session();
+            $usuarioSessao = $session->get('user_logged');
+            $session->forget('user_logged');
+
+            try {
+                $resultado = $callback($conta);
+            } finally {
+                if ($usuarioSessao !== null) {
+                    $session->put('user_logged', $usuarioSessao);
+                }
+            }
+
+            return response()->json($resultado);
         } catch (\Throwable $e) {
             report($e);
+
             return response()->json([
-                'erro' => $e->getMessage(),
-                'message' => $e->getMessage(),
+                'erro' => 'Não foi possível processar a operação do Mercado Pago.',
+                'message' => 'Não foi possível processar a operação do Mercado Pago.',
             ], 422);
         }
     }
@@ -133,25 +159,57 @@ class ContaReceberMercadoPagoController extends Controller
     {
         $secret = trim((string) ($config->mercadopago_webhook_secret ?? ''));
         if ($secret === '') {
+            // Compatibilidade com configurações antigas: mesmo sem secret, a
+            // conciliação ainda consulta o payment server-to-server com o Access
+            // Token da empresa e valida empresa/conta pela external_reference.
+            // O endpoint também possui rate limit. Novas configurações devem
+            // manter o secret preenchido para autenticação criptográfica adicional.
             return;
         }
 
-        // Compatível com versões novas do SDK oficial. Caso o projeto ainda use
-        // uma versão antiga, a segurança continua sendo garantida pela consulta
-        // server-to-server do payment usando o Access Token da própria empresa.
+        $xSignature = trim((string) $request->header('x-signature'));
+        $xRequestId = trim((string) $request->header('x-request-id'));
+
+        if ($xSignature === '' || $xRequestId === '') {
+            throw new RuntimeException('Webhook com assinatura ausente.');
+        }
+
+        // Usa o validador oficial quando a versão instalada do SDK o oferece.
         $validator = 'MercadoPago\\Webhook\\WebhookSignatureValidator';
-        if (!class_exists($validator)) {
-            return;
+        if (class_exists($validator)) {
+            try {
+                $validator::validate($xSignature, $xRequestId, $paymentId, $secret);
+                return;
+            } catch (\Throwable $e) {
+                throw new RuntimeException('Webhook com assinatura inválida.');
+            }
         }
 
-        try {
-            $validator::validate(
-                (string) $request->header('x-signature'),
-                (string) $request->header('x-request-id'),
-                $paymentId,
-                $secret
-            );
-        } catch (\Throwable $e) {
+        // Fallback compatível com o protocolo documentado pelo Mercado Pago:
+        // x-signature = ts=<timestamp>,v1=<hmac_sha256>
+        // manifest = id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+        $signatureParts = [];
+        foreach (explode(',', $xSignature) as $part) {
+            [$key, $value] = array_pad(explode('=', trim($part), 2), 2, null);
+            if ($key !== null && $value !== null) {
+                $signatureParts[trim($key)] = trim($value);
+            }
+        }
+
+        $timestamp = (string) ($signatureParts['ts'] ?? '');
+        $receivedHash = strtolower((string) ($signatureParts['v1'] ?? ''));
+
+        if ($timestamp === '' || $receivedHash === '' || !ctype_digit($timestamp)) {
+            throw new RuntimeException('Webhook com assinatura inválida.');
+        }
+
+        $manifest = 'id:' . strtolower($paymentId)
+            . ';request-id:' . $xRequestId
+            . ';ts:' . $timestamp . ';';
+
+        $calculatedHash = hash_hmac('sha256', $manifest, $secret);
+
+        if (!hash_equals($calculatedHash, $receivedHash)) {
             throw new RuntimeException('Webhook com assinatura inválida.');
         }
     }

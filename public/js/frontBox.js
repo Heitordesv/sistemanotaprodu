@@ -1,7 +1,12 @@
 var TOTAL = 0;
 var caixaAberto = false;
 var DESCONTO = 0;
+var DESCONTO_TIPO = 'fixo';
+var DESCONTO_VALOR_INFORMADO = 0;
 var VALORACRESCIMO = 0;
+var ACRESCIMO_TIPO = 'fixo';
+var ACRESCIMO_VALOR_INFORMADO = 0;
+var TAXA_ENTREGA = 0;
 var ITENS = [];
 var SENHADESBLOQUEADA = false;
 var PERCENTUALMAXDESCONTO = false;
@@ -260,65 +265,81 @@ $(".btn-add-item").click(() => {
 
 
 var total_venda = 0;
+
+function normalizarNumeroPdv(valor) {
+    if (typeof valor === 'number') {
+        return isFinite(valor) ? valor : 0;
+    }
+
+    var texto = String(valor || '').trim().replace(/[^0-9,.-]/g, '');
+    if (!texto) {
+        return 0;
+    }
+
+    if (texto.indexOf(',') >= 0) {
+        texto = texto.replace(/\./g, '').replace(',', '.');
+    }
+
+    var numero = parseFloat(texto);
+    return isFinite(numero) ? numero : 0;
+}
+
+function valorDoAjuste(tipo, valorInformado) {
+    var valor = Math.max(0, normalizarNumeroPdv(valorInformado));
+    return tipo === 'percentual'
+        ? total_venda * (valor / 100)
+        : valor;
+}
+
+function textoDoAjuste(tipo, valorInformado, valorCalculado) {
+    if (tipo === 'percentual' && normalizarNumeroPdv(valorInformado) > 0) {
+        return convertFloatToMoeda(normalizarNumeroPdv(valorInformado)) +
+            '% (R$ ' + convertFloatToMoeda(valorCalculado) + ')';
+    }
+
+    return 'R$ ' + convertFloatToMoeda(valorCalculado);
+}
+
+function recalcularAjustesPdv() {
+    DESCONTO = valorDoAjuste(DESCONTO_TIPO, DESCONTO_VALOR_INFORMADO);
+    VALORACRESCIMO = valorDoAjuste(ACRESCIMO_TIPO, ACRESCIMO_VALOR_INFORMADO);
+
+    $('#valor_desconto').text(
+        textoDoAjuste(DESCONTO_TIPO, DESCONTO_VALOR_INFORMADO, DESCONTO)
+    );
+    $('#valor_acrescimo').text(
+        textoDoAjuste(ACRESCIMO_TIPO, ACRESCIMO_VALOR_INFORMADO, VALORACRESCIMO)
+    );
+    $('#valor_taxa_entrega').text('R$ ' + convertFloatToMoeda(TAXA_ENTREGA));
+}
+
 function calcTotal() {
     var total = 0;
-    
-    $(".subtotal-item").each(function () {
+
+    $('.subtotal-item').each(function () {
         total += convertMoedaToFloat($(this).val());
     });
-    setTimeout(() => {
+
+    setTimeout(function () {
         total_venda = total;
+        TOTAL = total;
+        recalcularAjustesPdv();
 
-        $(".total-venda").html(
-            convertFloatToMoeda(total + parseFloat(VALORACRESCIMO) - parseFloat(DESCONTO))
-            );
-        $(".total-venda-modal").html(
-            convertFloatToMoeda(total + VALORACRESCIMO - DESCONTO)
-            );
-        $('#inp-valor_integral').val(convertFloatToMoeda(total_venda))
+        var totalLiquido = totalLiquidoPdv();
+        $('.total-venda').html(convertFloatToMoeda(totalLiquido));
+        $('.total-venda-modal').html(convertFloatToMoeda(totalLiquido));
+        $('#inp-valor_integral').val(convertFloatToMoeda(totalLiquido));
 
-        $('#inp-quantidade').val('')
-        $('#inp-valor_unitario').val('')
-        $('#inp-produto_id').val('').change()
+        $('#inp-quantidade').val('');
+        $('#inp-valor_unitario').val('');
+        $('#inp-produto_id').val('').change();
     }, 100);
 }
 
-$("#valor_recebido").on("keyup", (event) => {
-    // esconderTodasMoedas();
-    let t = total_venda;
-    let v = $("#valor_recebido").val();
-    v = v.replace(",", ".");
-
-    let troco = v - (total_venda - DESCONTO + VALORACRESCIMO);
-    if (troco > 0) {
-        $("#valor-troco").html(convertFloatToMoeda(troco));
-    } else {
-        $("#valor-troco").html("0,00");
-    }
-});
-
-$(".btn-desconto").keyup(() => {
-    let descontoInput = $(".btn-desconto").val();
-    
-    if (descontoInput) {
-        // Substitui a vírgula por ponto para o parseFloat funcionar
-        let porcentagem = parseFloat(descontoInput.replace(",", "."));
-        
-        // Validação: Impede que a porcentagem digitada seja maior que 100%
-        if (porcentagem > 100) {
-            $(".btn-desconto").val("");
-            DESCONTO = 0;
-            calcTotal();
-        } else {
-            // Pegamos o total atual (total_venda) e calculamos a porcentagem em dinheiro.
-            // A variável global DESCONTO recebe o valor real mapeado.
-            DESCONTO = total_venda * (porcentagem / 100);
-            calcTotal();
-        }
-    } else {
-        DESCONTO = 0;
-        calcTotal();
-    }
+$('#valor_recebido').on('keyup', function () {
+    var valorRecebido = normalizarNumeroPdv($('#valor_recebido').val());
+    var troco = valorRecebido - totalLiquidoPdv();
+    $('#valor-troco').html(convertFloatToMoeda(Math.max(0, troco)));
 });
 
 $("body").on("click", "#btn-incrementa", function () {
@@ -363,205 +384,117 @@ function calcSubTotal(e) {
     }, 10)
 }
 
-function setaDesconto() {
-    // validaPass((sim) => {
-    //     if (sim) {
-        if (total_venda == 0) {
-            swal("Erro", "Total da venda é igual a zero", "warning");
-        } else {
-            swal({
-                title: "Valor desconto?",
-                text: "Ultilize ponto(.) ao invés de virgula!",
-                content: "input",
-                button: {
-                    text: "Ok",
-                    closeModal: false,
-                    type: "error",
-                },
-            }).then((v) => {
-                if (v) {
-                    let desconto = v;
-                    if (desconto.substring(0, 1) == "%") {
-                        let perc = desconto.substring(1, desconto.length);
-                        DESCONTO = TOTAL * (perc / 100);
-                        if (PERCENTUALMAXDESCONTO > 0) {
-                            if (perc > PERCENTUALMAXDESCONTO) {
-                                swal.close();
-                                setTimeout(() => {
-                                    swal(
-                                        "Erro",
-                                        "Máximo de desconto permitido é de " +
-                                        PERCENTUALMAXDESCONTO +
-                                        "%",
-                                        "error"
-                                        );
-                                    $("#valor_desconto").html("0,00");
-                                }, 500);
-                            }
-                        }
-                        if (DESCONTO > 0) {
-                            $("#valor_item").attr("disabled", "disabled");
-                            $(".btn-mini-desconto").attr(
-                                "disabled",
-                                "disabled"
-                                );
-                        } else {
-                            $("#valor_item").removeAttr("disabled");
-                            $(".btn-mini-desconto").removeAttr("disabled");
-                        }
-                    } else {
-                        desconto = desconto.replace(",", ".");
-                        DESCONTO = parseFloat(desconto);
-                        if (PERCENTUALMAXDESCONTO > 0) {
-                            let tempDesc =
-                            (TOTAL * PERCENTUALMAXDESCONTO) / 100;
-                            if (tempDesc < DESCONTO) {
-                                swal.close();
-
-                                setTimeout(() => {
-                                    swal(
-                                        "Erro",
-                                        "Máximo de desconto permitido é de R$ " +
-                                        parseFloat(tempDesc),
-                                        "error"
-                                        );
-                                    $("#valor_desconto").html("0,00");
-                                }, 500);
-                            }
-                        }
-                        if (DESCONTO > 0) {
-                            $("#valor_item").attr("disabled", "disabled");
-                            $(".btn-mini-desconto").attr(
-                                "disabled",
-                                "disabled"
-                                );
-                        } else {
-                            $("#valor_item").removeAttr("disabled");
-                            $(".btn-mini-desconto").removeAttr("disabled");
-                        }
-                    }
-                    if (desconto.length == 0) DESCONTO = 0;
-                    $("#valor_desconto").html(convertFloatToMoeda(DESCONTO));
-                    calcTotal();
-                }
-                swal.close();
-                $("#codBarras").focus();
-            });
+function escolherTipoAjuste(titulo, callback) {
+    swal({
+        title: titulo,
+        text: 'Escolha como deseja informar o valor.',
+        icon: 'info',
+        buttons: {
+            cancelar: {
+                text: 'Cancelar',
+                value: null,
+                visible: true,
+            },
+            fixo: {
+                text: 'Valor em R$',
+                value: 'fixo',
+            },
+            percentual: {
+                text: 'Porcentagem %',
+                value: 'percentual',
+            },
+        },
+    }).then(function (tipo) {
+        if (tipo === 'fixo' || tipo === 'percentual') {
+            callback(tipo);
         }
-        // }
-    // });
+    });
 }
 
-// setaDesconto() {
-    // validaPass((sim) => {
-    //     if (sim) {
-       // if (total_venda == 0) {
-        //    swal("Erro", "Total da venda é igual a zero", "warning");
-       // } else {
-      //      swal({
-          //      title: "Porcentagem do desconto (%)?",
-           //     text: "Utilize ponto (.) ao invés de vírgula!",
-           ////     content: "input",
-            //    button: {
-              //      text: "Ok",
-              //      closeModal: false,
-               //     type: "error",
-              //  },
-        //    }).then((v) => {
-              //  if (v) {
-                    // Substitui a vírgula por ponto para o parseFloat funcionar
-                //    let perc = parseFloat(v.replace(",", "."));
-                    
-                 //   if (isNaN(perc) || perc <= 0) {
-                        DESCONTO = 0;
-                 //   } else {
-                        // Calcula o valor real em dinheiro baseado no total_venda atual
-                   //     DESCONTO = total_venda * (perc / 100);
+function solicitarValorAjuste(titulo, tipo, limitePercentual, callback) {
+    swal({
+        title: titulo,
+        text: tipo === 'percentual'
+            ? 'Digite a porcentagem. Exemplo: 10'
+            : 'Digite o valor em reais. Exemplo: 15,50',
+        content: 'input',
+        buttons: ['Cancelar', 'Aplicar'],
+    }).then(function (valor) {
+        if (valor === null) {
+            return;
+        }
 
-                        // Validação do percentual máximo permitido
-                      /// /  if (PERCENTUALMAXDESCONTO > 0 && perc > PERCENTUALMAXDESCONTO) {
-                       //     DESCONTO = 0;
-                         //   swal.close();
-                          //  setTimeout(() => {
-                           //     swal(
-                              //      "Erro",
-                              //      "Máximo de desconto permitido é de " + PERCENTUALMAXDESCONTO + "%",
-                                //    "error"
-                               // );
-                               // $("#valor_desconto").html("0,00");
-                             //   calcTotal();
-                           // }, 500);
-                           // return; // Para a execução para não aplicar o desconto inválido
-                     //  }
-                  //  }
+        var numero = normalizarNumeroPdv(valor);
+        var limite = limitePercentual || 1000;
+        if (numero < 0 || (tipo === 'percentual' && numero > limite)) {
+            swal(
+                'Valor inválido',
+                tipo === 'percentual'
+                    ? 'A porcentagem deve ficar entre 0% e ' + limite + '%.'
+                    : 'Informe um valor igual ou maior que zero.',
+                'warning'
+            );
+            return;
+        }
 
-                    // Bloqueia/Desbloqueia os campos dependendo do valor do desconto
-                  ///  if (DESCONTO > 0) {
-                   //     $("#valor_item").attr("disabled", "disabled");
-                   //     $(".btn-mini-desconto").attr("disabled", "disabled");
-                   // } else {
-                   ///     $("#valor_item").removeAttr("disabled");
-                    //    $(".btn-mini-desconto").removeAttr("disabled");
-                   // }
+        callback(numero);
+        calcTotal();
+        $('#codBarras').focus();
+    });
+}
 
-                  //  $("#valor_desconto").html(convertFloatToMoeda(DESCONTO));
-                  //  calcTotal();
-              //  } else {
-                    // Se o prompt for fechado vazio, zera o desconto
-                 //   DESCONTO = 0;
-                   // $("#valor_desconto").html("0,00");
-                   // calcTotal();
-               // }
-               // swal.close();
-             // // $("#codBarras").focus();
-          //  });
-     //   }
-        // }
-    // });
-//}
+function setaDesconto() {
+    if (total_venda <= 0) {
+        swal('Venda sem produtos', 'Adicione um produto antes de aplicar desconto.', 'warning');
+        return;
+    }
+
+    escolherTipoAjuste('Aplicar desconto', function (tipo) {
+        solicitarValorAjuste('Valor do desconto', tipo, 100, function (valor) {
+            var limite = normalizarNumeroPdv($('#percentual_max_desconto').val());
+            var percentualEquivalente = tipo === 'percentual'
+                ? valor
+                : (total_venda > 0 ? (valor / total_venda) * 100 : 0);
+
+            if (limite > 0 && percentualEquivalente > limite + 0.0001) {
+                swal(
+                    'Desconto acima do permitido',
+                    'O máximo configurado para esta empresa é ' +
+                        convertFloatToMoeda(limite) + '%.',
+                    'warning'
+                );
+                return;
+            }
+
+            DESCONTO_TIPO = tipo;
+            DESCONTO_VALOR_INFORMADO = valor;
+        });
+    });
+}
 
 function setaAcrescimo() {
-    if (total_venda == 0) {
-        swal("Erro", "Total da venda é igual a zero", "warning");
-    } else {
-        swal({
-            title: "Valor acrescimo?",
-            text: "Ultilize ponto(.) ao invés de virgula!",
-            content: "input",
-            button: {
-                text: "Ok",
-                closeModal: false,
-                type: "error",
-            },
-        }).then((v) => {
-            if (v) {
-                let acrescimo = v;
-                if (acrescimo > 0) {
-                    DESCONTO = 0;
-                    $("#valor_desconto").html(convertFloatToMoeda(DESCONTO));
-                }
-
-                let total = total_venda;
-
-                if (acrescimo.substring(0, 1) == "%") {
-                    let perc = acrescimo.substring(1, acrescimo.length);
-                    VALORACRESCIMO = total * (perc / 100);
-                } else {
-                    acrescimo = acrescimo.replace(",", ".");
-                    VALORACRESCIMO = parseFloat(acrescimo);
-                }
-
-                if (acrescimo.length == 0) VALORACRESCIMO = 0;
-                calcTotal();
-                VALORACRESCIMO = parseFloat(VALORACRESCIMO);
-                $("#valor_acrescimo").html(convertFloatToMoeda(VALORACRESCIMO));
-
-                calcTotal();
-                $("#codBarras").focus();
-            }
-            swal.close();
-        });
+    if (total_venda <= 0) {
+        swal('Venda sem produtos', 'Adicione um produto antes de aplicar acréscimo.', 'warning');
+        return;
     }
+
+    escolherTipoAjuste('Aplicar acréscimo', function (tipo) {
+        solicitarValorAjuste('Valor do acréscimo', tipo, 1000, function (valor) {
+            ACRESCIMO_TIPO = tipo;
+            ACRESCIMO_VALOR_INFORMADO = valor;
+        });
+    });
+}
+
+function setaTaxaEntrega() {
+    if (total_venda <= 0) {
+        swal('Venda sem produtos', 'Adicione um produto antes de informar a taxa de entrega.', 'warning');
+        return;
+    }
+
+    solicitarValorAjuste('Taxa de entrega', 'fixo', null, function (valor) {
+        TAXA_ENTREGA = valor;
+    });
 }
 
 function validaPass(call) {
@@ -609,7 +542,7 @@ function validaPass(call) {
 var total_payment = 0;
 
 function totalLiquidoPdv() {
-    return Math.max(0, Number(total_venda || 0) + Number(VALORACRESCIMO || 0) - Number(DESCONTO || 0));
+    return Math.max(0, Number(total_venda || 0) + Number(TAXA_ENTREGA || 0) + Number(VALORACRESCIMO || 0) - Number(DESCONTO || 0));
 }
 
 function totalLinhasPagamento() {
@@ -970,8 +903,13 @@ $('#form-pdv').on('submit', function (e) {
     var json = $(this).serializeFormJSON();
     json.empresa_id = $('#empresa_id').val();
     json.usuario_id = $('#usuario_id').val();
-    json.desconto = convertMoedaToFloat($('#valor_desconto').text());
-    json.acrescimo = convertMoedaToFloat($('#valor_acrescimo').text());
+    json.desconto = DESCONTO;
+    json.desconto_tipo = DESCONTO_TIPO;
+    json.desconto_valor = DESCONTO_VALOR_INFORMADO;
+    json.acrescimo = VALORACRESCIMO;
+    json.acrescimo_tipo = ACRESCIMO_TIPO;
+    json.acrescimo_valor = ACRESCIMO_VALOR_INFORMADO;
+    json.taxa_entrega = TAXA_ENTREGA;
 
     window.__pdvSubmissionInProgress = true;
     $('#salvar_venda').attr('disabled', true);

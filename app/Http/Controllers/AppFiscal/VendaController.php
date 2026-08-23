@@ -54,34 +54,36 @@ class VendaController extends Controller
 		$dataFinal = $request->data_final;
 		$cliente = $request->cliente;
 		$estado = $request->estado ? $request->estado : 'TODOS';
+		$empresaId = (int) $request->empresa_id;
 
 		if(isset($cliente) && isset($dataInicial) && isset($dataFinal)){
-			$vendas = Venda::filtroDataCliente(
-				$cliente, 
+			$vendas = Venda::filtroDataClienteApp(
+				$cliente,
 				$this->parseDate($dataInicial),
 				$this->parseDate($dataFinal, true),
-				$estado
+				$estado,
+				$empresaId
 			);
 		}else if(isset($dataInicial) && isset($dataFinal)){
-			$vendas = Venda::filtroData(
+			$vendas = Venda::filtroDataApp(
 				$this->parseDate($dataInicial),
 				$this->parseDate($dataFinal, true),
-				$estado
+				$estado,
+				$empresaId
 			);
 		}else if(isset($cliente)){
-			$vendas = Venda::filtroCliente(
+			$vendas = Venda::filtroClienteApp(
 				$cliente,
-				$estado
+				$estado,
+				$empresaId
 			);
-
-
-		}else if(isset($estado)){
-			$vendas = Venda::filtroEstado(
-				$estado
+		}else{
+			$vendas = Venda::filtroEstadoApp(
+				$estado,
+				$empresaId
 			);
 		}
 
-		// $vendas = Venda::orderBy('id', 'desc')->get();
 		foreach($vendas as $v){
 			foreach($v->itens as $i){
 				$i->produto;
@@ -398,7 +400,7 @@ class VendaController extends Controller
 	}
 
 	public function ambiente(Request $request){
-		$config = ConfigNota::find($request->empresa_id);
+		$config = ConfigNota::where('empresa_id', $request->empresa_id)->first();
 		if($config != null){
 			return response()->json($config->ambiente, 200);
 		}else{

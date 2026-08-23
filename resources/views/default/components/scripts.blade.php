@@ -11,6 +11,17 @@
 <script src="/assets/js/bootstrap.bundle.min.js"></script>
 <!--plugins-->
 <script src="/assets/js/jquery.min.js"></script>
+<script type="text/javascript">
+    // O empresa_id enviado pelo navegador não é identidade de tenant. As APIs
+    // fiscais validam este hash e substituem o empresa_id antes do controller.
+    if (typeof hash !== 'undefined' && hash) {
+        $.ajaxSetup({
+            headers: {
+                'X-Empresa-Hash': hash
+            }
+        });
+    }
+</script>
 <script src="/assets/js/simplebar.min.js"></script>
 <script src="/assets/js/metisMenu.min.js"></script>
 <script src="/assets/js/perfect-scrollbar.js"></script>
@@ -91,7 +102,7 @@
 
 @if(session()->has('flash_warning'))
 <script type="text/javascript">
-    var audio = new Audio('/audio/warning.mp3');
+    var audio = new Audio('/audio/error.mp3');
     audio.addEventListener('canplaythrough', function() {
         audio.play();
     });
