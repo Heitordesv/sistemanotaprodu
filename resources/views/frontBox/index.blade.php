@@ -849,26 +849,29 @@
             findByBarcode: @json(route('frenteCaixa.produtos.findByBarcode')),
             findByBarcodeReference: @json(route('frenteCaixa.produtos.findByBarcodeReference'))
         };
+        window.pdvNfceTransmitirUrl = @json(route('frenteCaixa.nfce.transmitir'));
     </script>
 
     <script src="{{ asset('assets/js/jquery.min.js') }}"></script>
     <script>
         const pdvEmpresaHash = @json(data_get(session('user_logged'), 'hash_empresa'));
 
+        const pdvAjaxHeaders = {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        };
+
         if (pdvEmpresaHash) {
-            $.ajaxSetup({
-                headers: {
-                    'X-Empresa-Hash': pdvEmpresaHash
-                }
-            });
+            pdvAjaxHeaders['X-Empresa-Hash'] = pdvEmpresaHash;
         }
+
+        $.ajaxSetup({ headers: pdvAjaxHeaders });
     </script>
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.js"></script>
     <script src="{{ asset('js/jquery.mask.min.js') }}"></script>
     <script src="{{ asset('assets/js/select2.min.js') }}"></script>
     <script src="{{ asset('js/main.js') }}?v=10"></script>
-    <script src="{{ asset('js/frontBox.js') }}?v=10"></script>
+    <script src="{{ asset('js/frontBox.js') }}?v=11"></script>
     <script src="{{ asset('js/theme.js') }}?v=1"></script>
     <script src="{{ asset('assets/js/toastr.min.js') }}"></script>
 
