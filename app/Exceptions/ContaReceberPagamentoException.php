@@ -2,8 +2,8 @@
 
 namespace App\Exceptions;
 
-use DomainException;
+use RuntimeException;
 
-class ContaReceberPagamentoException extends DomainException
+class ContaReceberPagamentoException extends RuntimeException
 {
 }
