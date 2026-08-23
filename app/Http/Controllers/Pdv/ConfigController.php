@@ -59,7 +59,7 @@ class ConfigController extends Controller
 
 	/**
 	 * Endpoint legado usado apenas como teste de conectividade pelo PDV Java.
-	 * KEY_APP não é mais enviado pelo cliente nem validado aqui.
+	 * O segredo legado não é mais enviado pelo cliente nem validado aqui.
 	 */
 	public function teste(Request $request){
 		return response()->json("ok", 200);
