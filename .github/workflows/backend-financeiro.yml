@@ -67,6 +67,7 @@ jobs:
           vendor/bin/phpunit
           tests/Feature/CaixaRecebimentosTest.php
           tests/Feature/ContaReceberPagamentoConcorrenciaTest.php
+          tests/Feature/ContaReceberPagamentoIdempotenciaTest.php
 
       - name: MySQL InnoDB concurrency and migration tests
         run: >-
