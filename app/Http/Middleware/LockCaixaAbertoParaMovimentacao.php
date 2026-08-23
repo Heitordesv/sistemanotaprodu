@@ -22,6 +22,11 @@ class LockCaixaAbertoParaMovimentacao
             return $next($request);
         }
 
+        // O navegador nunca é autoridade para escolher a sessão de caixa.
+        // Remove o valor antes da consulta; somente uma abertura encontrada
+        // pelo servidor, sob lock, poderá ser reinjetada no request.
+        $request->request->remove('abertura_caixa_id');
+
         $user = session('user_logged');
         $empresaId = (int) (is_object($user)
             ? ($user->empresa_id ?? 0)
@@ -41,7 +46,6 @@ class LockCaixaAbertoParaMovimentacao
                 $usuarioId,
                 function (?AberturaCaixa $abertura) use ($request, $next) {
                     if ($abertura) {
-                        // Nunca aceitar abertura_caixa_id enviada pelo navegador.
                         $request->merge(['abertura_caixa_id' => (int) $abertura->id]);
                         $request->attributes->set('abertura_caixa_bloqueada', $abertura);
                     }
