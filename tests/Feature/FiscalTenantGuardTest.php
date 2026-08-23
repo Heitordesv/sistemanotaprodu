@@ -384,6 +384,11 @@ class FiscalTenantGuardTest extends TestCase
 
         $this->assertStringContainsString('X-Empresa-Hash', $scripts);
         $this->assertStringContainsString("session('user_logged')['hash_empresa']", $scripts);
+
+        $frontBox = (string) file_get_contents(resource_path('views/frontBox/index.blade.php'));
+        $this->assertStringContainsString('X-Empresa-Hash', $frontBox);
+        $this->assertStringContainsString("data_get(session('user_logged'), 'hash_empresa')", $frontBox);
+        $this->assertStringContainsString('$.ajaxSetup', $frontBox);
     }
 
     public function test_guard_central_escopa_recurso_por_empresa_id_e_oculta_idor_com_404(): void
