@@ -54,9 +54,17 @@ class FiscalCertificateService
 
     public function deleteForEmpresa(int $empresaId): int
     {
-        return DB::transaction(fn () => Certificado::query()
+        if ($empresaId <= 0) {
+            throw new \InvalidArgumentException('Empresa inválida.');
+        }
+
+        $deleted = DB::transaction(fn () => Certificado::query()
             ->where('empresa_id', $empresaId)
             ->delete());
+
+        $this->deletePrivateCopiesForEmpresa($empresaId);
+
+        return $deleted;
     }
 
     public function publicInfoForEmpresa(int $empresaId): ?array
@@ -89,6 +97,33 @@ class FiscalCertificateService
                 'legivel' => false,
             ];
         }
+    }
+
+    private function deletePrivateCopiesForEmpresa(int $empresaId): void
+    {
+        $directory = storage_path('app/private/certificados/' . $empresaId);
+
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        $files = scandir($directory);
+        if ($files === false) {
+            return;
+        }
+
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
+            $path = $directory . DIRECTORY_SEPARATOR . $file;
+            if (is_file($path) || is_link($path)) {
+                @unlink($path);
+            }
+        }
+
+        @rmdir($directory);
     }
 
     private function certificateBytes(string $arquivo): string
