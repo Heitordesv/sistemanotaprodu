@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\AutorizacaoDevolucao;
 use App\Models\Usuario;
-use App\Models\VendaCaixa;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AutorizacaoDevolucaoService
@@ -41,10 +41,7 @@ class AutorizacaoDevolucaoService
             ->where('ativo', true)
             ->first();
 
-        if (
-            !$administrador ||
-            !hash_equals((string) $administrador->senha, md5($senha))
-        ) {
+        if (!$administrador || !$this->senhaValida($administrador, $senha)) {
             throw ValidationException::withMessages([
                 'admin_senha' => 'Administrador ou senha inválidos.',
             ]);
@@ -56,8 +53,37 @@ class AutorizacaoDevolucaoService
         ];
     }
 
+    private function senhaValida(Usuario $administrador, string $senha): bool
+    {
+        $hash = (string) $administrador->senha;
+
+        // Compatibilidade temporária com o legado MD5. Testamos o formato antes
+        // de chamar Hash::check para não submeter um hash antigo ao BcryptHasher.
+        if (preg_match('/^[a-f0-9]{32}$/i', $hash) === 1) {
+            $legadoValido = hash_equals(strtolower($hash), md5($senha));
+
+            if ($legadoValido) {
+                $administrador->senha = Hash::make($senha);
+                $administrador->save();
+            }
+
+            return $legadoValido;
+        }
+
+        if ($hash !== '' && Hash::check($senha, $hash)) {
+            if (Hash::needsRehash($hash)) {
+                $administrador->senha = Hash::make($senha);
+                $administrador->save();
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     public function registrar(
-        VendaCaixa $venda,
+        $venda,
         Usuario $solicitante,
         Usuario $autorizador,
         string $tipo,

@@ -13,7 +13,7 @@ class VendaCaixa extends Model
 		'dinheiro_recebido', 'troco', 'nome', 'cpf', 'observacao', 'desconto', 'acrescimo',
 		'pedido_delivery_id', 'empresa_id', 'bandeira_cartao',
 		'cnpj_cartao', 'cAut_cartao', 'descricao_pag_outros', 'rascunho', 'consignado', 'pdv_java',
-		'retorno_estoque', 'qr_code_base64', 'filial_id', 'abertura_caixa_id'
+		'retorno_estoque', 'qr_code_base64', 'filial_id', 'abertura_caixa_id', 'estoque_filial_id'
 	];
 
 

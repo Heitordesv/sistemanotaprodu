@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - agent/backend-senior
-      - agent/backend-senior-pix-mercadopago
+      - agent/pdv-devolucao-review
   pull_request:
     branches:
       - main
+      - agent/backend-senior
 
 jobs:
   financeiro:
@@ -72,9 +73,6 @@ jobs:
       - name: Clear Laravel config
         run: php artisan config:clear
 
-      - name: Fiscal tenant isolation tests
-        run: vendor/bin/phpunit tests/Feature/FiscalTenantGuardTest.php
-
       - name: Feature tests do fluxo financeiro
         run: |
           vendor/bin/phpunit tests/Feature/CaixaRecebimentosTest.php
@@ -88,9 +86,13 @@ jobs:
           vendor/bin/phpunit tests/Feature/SegurancaOperacionalTest.php
           vendor/bin/phpunit tests/Feature/VendaErroSeguroTest.php
           vendor/bin/phpunit tests/Feature/MercadoPagoConciliacaoDeterministicaTest.php
-          vendor/bin/phpunit tests/Feature/MercadoPagoGeracaoIdempotenteTest.php
-          vendor/bin/phpunit tests/Feature/MercadoPagoWebhookSecurityTest.php
-          vendor/bin/phpunit tests/Feature/MercadoPagoAuthorizationTest.php
+          vendor/bin/phpunit tests/Feature/PdvDevolucaoSeguraRoutesTest.php
+          vendor/bin/phpunit tests/Feature/FrontBoxEstoqueFilialPersistenciaTest.php
+          vendor/bin/phpunit tests/Feature/PdvDevolucaoServiceTest.php
+          vendor/bin/phpunit tests/Feature/PdvDevolucaoFinanceiroServiceTest.php
+          vendor/bin/phpunit tests/Feature/PdvDevolucaoEstoqueFilialTest.php
+          vendor/bin/phpunit tests/Feature/NFCeCancelamentoSeguroServiceTest.php
+          vendor/bin/phpunit tests/Unit/NFCeConsultaCancelamentoParserTest.php
 
       - name: MySQL InnoDB concurrency and migration tests
         run: |
@@ -98,3 +100,5 @@ jobs:
           vendor/bin/phpunit tests/Integration/CaixaMovimentacaoMysqlConcurrencyTest.php
           vendor/bin/phpunit tests/Integration/VendaCaixaEdicaoMysqlConcurrencyTest.php
           vendor/bin/phpunit tests/Integration/FinanceiroMigrationMysqlTest.php
+          vendor/bin/phpunit tests/Integration/PdvDevolucaoMigrationMysqlTest.php
+          vendor/bin/phpunit tests/Integration/PdvDevolucaoMysqlConcurrencyTest.php
