@@ -77,6 +77,9 @@ jobs:
           vendor/bin/phpunit tests/Feature/FiscalTenantGuardTest.php
           vendor/bin/phpunit tests/Feature/FiscalTenantGuardDatabaseTest.php
 
+      - name: Fiscal secrets and certificate isolation tests
+        run: vendor/bin/phpunit tests/Feature/FiscalSecretsSecurityTest.php
+
       - name: PDV authentication security tests
         run: |
           vendor/bin/phpunit tests/Feature/PdvAuthSecurityTest.php
