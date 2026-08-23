@@ -109,6 +109,10 @@ class ContaReceber extends Model
             ];
         }
 
+        // Compatibilidade para fluxos legados: quando o caller já está dentro de
+        // uma transação, disputa o mesmo lock usado pelo fechamento do caixa.
+        // Os fluxos novos usam ContaReceberPagamentoService e travam a abertura
+        // antes da própria conta, evitando inversão de ordem e histórico tardio.
         $abertura = AberturaCaixa::query()
             ->where('empresa_id', $empresaSessao)
             ->where('usuario_id', $usuarioId)
@@ -117,6 +121,7 @@ class ContaReceber extends Model
                 return $query->where('filial_id', (int) $conta->filial_id);
             })
             ->orderByDesc('id')
+            ->lockForUpdate()
             ->first();
 
         return [
