@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/backend-senior
+      - agent/pdv-devolucao-review
   pull_request:
     branches:
       - main
@@ -81,6 +82,10 @@ jobs:
           vendor/bin/phpunit tests/Feature/SangriaDinheiroGavetaTest.php
           vendor/bin/phpunit tests/Feature/ContaReceberPagamentoConcorrenciaTest.php
           vendor/bin/phpunit tests/Feature/ContaReceberPagamentoIdempotenciaTest.php
+          vendor/bin/phpunit tests/Feature/SegurancaOperacionalTest.php
+          vendor/bin/phpunit tests/Feature/VendaErroSeguroTest.php
+          vendor/bin/phpunit tests/Feature/MercadoPagoConciliacaoDeterministicaTest.php
+          vendor/bin/phpunit tests/Feature/PdvDevolucaoSeguraRoutesTest.php
 
       - name: MySQL InnoDB concurrency and migration tests
         run: |
@@ -88,3 +93,4 @@ jobs:
           vendor/bin/phpunit tests/Integration/CaixaMovimentacaoMysqlConcurrencyTest.php
           vendor/bin/phpunit tests/Integration/VendaCaixaEdicaoMysqlConcurrencyTest.php
           vendor/bin/phpunit tests/Integration/FinanceiroMigrationMysqlTest.php
+          vendor/bin/phpunit tests/Integration/PdvDevolucaoMigrationMysqlTest.php

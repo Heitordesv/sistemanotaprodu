@@ -107,6 +107,7 @@ $('#btn-cancelar-send').click(() => {
     let motivo = $('#inp-motivo-cancela').val()
     let admin_id = $('#cancelamento_admin_id').val()
     let admin_senha = $('#cancelamento_admin_senha').val()
+    let csrf = $('meta[name="csrf-token"]').attr('content') || $('#_token').val()
 
     if(motivo.length < 15){
         swal("Alerta", "Informe no mínimo 15 caracteres", "warning")
@@ -122,6 +123,7 @@ $('#btn-cancelar-send').click(() => {
     botao.prop('disabled', true).text('Autorizando...')
 
     $.post(path_url + "api/nfce/cancelar", {
+        _token: csrf,
         id: id,
         empresa_id: empresa_id,
         motivo: motivo,
@@ -130,7 +132,13 @@ $('#btn-cancelar-send').click(() => {
     })
     .done((success) => {
         let infEvento = success.retEvento.infEvento
-        swal("Sucesso", "[" + infEvento.cStat + "] " + infEvento.xMotivo, "success")
+        let mensagem = "[" + infEvento.cStat + "] " + infEvento.xMotivo
+
+        if(success.pdv_devolucao && success.pdv_devolucao.pendente_financeiro){
+            mensagem += "\n\nA NFC-e e o estoque já foram cancelados. Falta somente regularizar o financeiro. Depois, use 'Retomar financeiro'; a SEFAZ não será chamada novamente."
+        }
+
+        swal("Sucesso", mensagem, "success")
         .then(() => {
             window.open(path_url+'nfe/imprimir-cancela/'+id, "_blank")
             setTimeout(() => {
@@ -146,6 +154,12 @@ $('#btn-cancelar-send').click(() => {
         try{
             if(err.responseJSON.retEvento.infEvento.xMotivo){
                 mensagem = err.responseJSON.retEvento.infEvento.xMotivo
+            }
+        }catch(e){}
+
+        try{
+            if(err.responseJSON.message){
+                mensagem = err.responseJSON.message
             }
         }catch(e){}
 
@@ -192,4 +206,3 @@ $('#btn-inutilizar-send').click(() => {
 		swal("Alerta", "Informe no mínimo 15 caracteres", "warning")
 	}
 })
-
