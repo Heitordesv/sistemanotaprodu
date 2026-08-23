@@ -4,9 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AberturaCaixa;
 use App\Models\SangriaCaixa;
-use App\Models\SuprimentoCaixa;
-use App\Models\Venda;
-use App\Models\VendaCaixa;
+use App\Services\CaixaResumoService;
 use Illuminate\Http\Request;
 
 class SangriaCaixaController extends Controller
@@ -49,19 +47,27 @@ class SangriaCaixaController extends Controller
 
         $empresaId = (int) (is_object($user) ? $user->empresa_id : $user['empresa']);
         $usuarioId = (int) (is_object($user) ? $user->id : $user['id']);
-        $valor = (float) __convert_value_bd($request->valor);
+        $valor = round((float) __convert_value_bd($request->valor), 2);
 
         if ($valor <= 0) {
             return redirect()->back()
                 ->with('flash_erro', 'Informe um valor de sangria maior que zero.');
         }
 
-        $caixaAberto = AberturaCaixa::query()
-            ->where('empresa_id', $empresaId)
-            ->where('usuario_id', $usuarioId)
-            ->where('status', 0)
-            ->orderByDesc('id')
-            ->first();
+        // A rota financeira usa caixaMovimento:obrigatorio. Quando disponível,
+        // reutilizamos exatamente a AberturaCaixa que o middleware já manteve
+        // sob lockForUpdate durante toda a requisição. O fallback preserva a
+        // compatibilidade com chamadas legadas/diretas do controller.
+        $caixaAberto = $request->attributes->get('abertura_caixa_bloqueada');
+
+        if (!$caixaAberto instanceof AberturaCaixa) {
+            $caixaAberto = AberturaCaixa::query()
+                ->where('empresa_id', $empresaId)
+                ->where('usuario_id', $usuarioId)
+                ->where('status', 0)
+                ->orderByDesc('id')
+                ->first();
+        }
 
         if (!$caixaAberto) {
             return redirect()->route('caixa.index')
@@ -69,90 +75,37 @@ class SangriaCaixaController extends Controller
         }
 
         try {
-            if ($valor <= $this->somaTotalEmCaixa($caixaAberto)) {
-                SangriaCaixa::create([
-                    'usuario_id' => $usuarioId,
-                    'valor' => round($valor, 2),
-                    'observacao' => trim((string) ($request->observacao ?? '')),
-                    'empresa_id' => $empresaId,
-                    'abertura_caixa_id' => (int) $caixaAberto->id,
-                ]);
+            $resumo = app(CaixaResumoService::class)->resumir($caixaAberto);
+            $dinheiroDisponivel = round((float) ($resumo['dinheiroNaGaveta'] ?? 0), 2);
 
-                session()->flash('flash_sucesso', 'Sangria realizada com sucesso!');
-            } else {
+            // Sangria representa retirada física da gaveta. Portanto o limite é
+            // somente o dinheiro efetivamente disponível: abertura + vendas em
+            // dinheiro + recebimentos de contas em dinheiro + suprimentos -
+            // sangrias. PIX, cartões e demais meios não aumentam este limite.
+            if ($valor > $dinheiroDisponivel) {
                 session()->flash(
                     'flash_erro',
-                    'Valor de sangria ultrapassa o valor disponível neste caixa!'
+                    'Valor de sangria ultrapassa o dinheiro disponível neste caixa! Disponível: R$ '
+                    . number_format(max(0, $dinheiroDisponivel), 2, ',', '.')
                 );
+
+                return redirect()->back();
             }
+
+            SangriaCaixa::create([
+                'usuario_id' => $usuarioId,
+                'valor' => $valor,
+                'observacao' => trim((string) ($request->observacao ?? '')),
+                'empresa_id' => $empresaId,
+                'abertura_caixa_id' => (int) $caixaAberto->id,
+            ]);
+
+            session()->flash('flash_sucesso', 'Sangria realizada com sucesso!');
         } catch (\Exception $e) {
             session()->flash('flash_erro', 'Não foi possível registrar a sangria.');
             __saveLogError($e, $empresaId);
         }
 
         return redirect()->back();
-    }
-
-    private function somaTotalEmCaixa(AberturaCaixa $abertura): float
-    {
-        $empresaId = (int) $abertura->empresa_id;
-        $usuarioId = (int) $abertura->usuario_id;
-        $aberturaId = (int) $abertura->id;
-
-        $soma = (float) $abertura->valor;
-
-        $soma += (float) VendaCaixa::query()
-            ->where('empresa_id', $empresaId)
-            ->where('usuario_id', $usuarioId)
-            ->where(function ($query) use ($abertura, $aberturaId) {
-                $query->where('abertura_caixa_id', $aberturaId)
-                    ->orWhere(function ($legacy) use ($abertura) {
-                        $legacy->whereNull('abertura_caixa_id')
-                            ->where('id', '>', (int) $abertura->primeira_venda_nfce);
-                    });
-            })
-            ->where('rascunho', false)
-            ->where('consignado', false)
-            ->where('estado_emissao', '!=', 'cancelado')
-            ->sum('valor_total');
-
-        $soma += (float) Venda::query()
-            ->where('empresa_id', $empresaId)
-            ->where('usuario_id', $usuarioId)
-            ->where(function ($query) use ($abertura, $aberturaId) {
-                $query->where('abertura_caixa_id', $aberturaId)
-                    ->orWhere(function ($legacy) use ($abertura) {
-                        $legacy->whereNull('abertura_caixa_id')
-                            ->where('id', '>', (int) $abertura->primeira_venda_nfe);
-                    });
-            })
-            ->where('estado_emissao', '!=', 'cancelado')
-            ->sum('valor_total');
-
-        $soma += (float) SuprimentoCaixa::query()
-            ->where('empresa_id', $empresaId)
-            ->where('usuario_id', $usuarioId)
-            ->where(function ($query) use ($abertura, $aberturaId) {
-                $query->where('abertura_caixa_id', $aberturaId)
-                    ->orWhere(function ($legacy) use ($abertura) {
-                        $legacy->whereNull('abertura_caixa_id')
-                            ->where('created_at', '>=', $abertura->created_at);
-                    });
-            })
-            ->sum('valor');
-
-        $soma -= (float) SangriaCaixa::query()
-            ->where('empresa_id', $empresaId)
-            ->where('usuario_id', $usuarioId)
-            ->where(function ($query) use ($abertura, $aberturaId) {
-                $query->where('abertura_caixa_id', $aberturaId)
-                    ->orWhere(function ($legacy) use ($abertura) {
-                        $legacy->whereNull('abertura_caixa_id')
-                            ->where('created_at', '>=', $abertura->created_at);
-                    });
-            })
-            ->sum('valor');
-
-        return round($soma, 2);
     }
 }
