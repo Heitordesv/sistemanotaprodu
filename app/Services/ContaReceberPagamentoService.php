@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
+use App\Exceptions\ContaReceberPagamentoException;
 use App\Models\AberturaCaixa;
 use App\Models\ContaReceber;
 use App\Models\ContaReceberPagamento;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 class ContaReceberPagamentoService
 {
@@ -15,8 +15,6 @@ class ContaReceberPagamentoService
     public function registrarMultiplos(ContaReceber $conta, array $pagamentos, string $dataPagamento, ?string $loteUuid = null): ContaReceber
     {
         return DB::transaction(function () use ($conta, $pagamentos, $dataPagamento, $loteUuid) {
-            // Fast-path para retry de uma operação já confirmada, inclusive se o
-            // caixa já tiver sido fechado depois do primeiro processamento.
             if ($loteUuid && $this->loteIndividualRegistrado(
                 (int) $conta->id,
                 (int) $conta->empresa_id,
@@ -27,24 +25,17 @@ class ContaReceberPagamentoService
                 );
             }
 
-            // A abertura é sempre o primeiro recurso bloqueado. O fechamento do
-            // caixa bloqueia a mesma linha, eliminando a corrida recebimento x fechamento.
             $contexto = $this->resolverCaixaAbertoComLock(
                 (int) $conta->empresa_id,
                 $conta->filial_id ? (int) $conta->filial_id : null
             );
 
-            // Depois da abertura, bloqueamos a conta. Isso também serializa duas
-            // tentativas sobre a mesma conta vindas de caixas/operadores distintos.
             $conta = ContaReceber::query()
                 ->whereKey($conta->id)
                 ->where('empresa_id', $contexto['empresa_id'])
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // Revalidação obrigatória DEPOIS dos locks. lockForUpdate() faz uma
-            // leitura corrente no InnoDB, enxergando um lote que tenha sido
-            // confirmado enquanto esta transação aguardava os locks.
             if ($loteUuid && $this->loteIndividualRegistrado(
                 (int) $conta->id,
                 (int) $conta->empresa_id,
@@ -57,7 +48,7 @@ class ContaReceberPagamentoService
             $this->validarFilialDaConta($conta, $contexto['abertura']);
 
             if ((int) $conta->status === 1 || (float) $conta->valor_recebido >= (float) $conta->valor_integral) {
-                throw new RuntimeException('Esta conta já está quitada.');
+                throw new ContaReceberPagamentoException('Esta conta já está quitada.');
             }
 
             $normalizados = [];
@@ -83,7 +74,7 @@ class ContaReceberPagamentoService
             }
 
             if (!$normalizados || $totalNovo <= 0) {
-                throw new RuntimeException('Informe pelo menos uma forma de pagamento com valor maior que zero.');
+                throw new ContaReceberPagamentoException('Informe pelo menos uma forma de pagamento com valor maior que zero.');
             }
 
             $recebidoAtual = round((float) $conta->valor_recebido, 2);
@@ -92,7 +83,7 @@ class ContaReceberPagamentoService
             $totalNovo = round($totalNovo, 2);
 
             if ($totalNovo > $saldoRestante + 0.009) {
-                throw new RuntimeException(
+                throw new ContaReceberPagamentoException(
                     'O total informado (R$ ' . number_format($totalNovo, 2, ',', '.') .
                     ') é maior que o saldo restante (R$ ' . number_format($saldoRestante, 2, ',', '.') . ').'
                 );
@@ -115,8 +106,6 @@ class ContaReceberPagamentoService
                     'observacao' => $pagamento['observacao'],
                 ]);
 
-                // O histórico do caixa é granular por forma de pagamento. Nunca
-                // usamos o tipo agregado 99 para representar dinheiro + PIX/cartão.
                 $this->registrarHistoricoCaixa(
                     $conta,
                     $contexto,
@@ -136,19 +125,12 @@ class ContaReceberPagamentoService
             $conta->received_by_user_id = $contexto['usuario_id'];
             $conta->abertura_caixa_id = $contexto['abertura']->id;
             $conta->received_at = $recebidoEm;
-
-            // O serviço já gravou o histórico granular acima. Evita o observer
-            // criar uma segunda linha agregada (por exemplo R$45 com tipo 99).
             $conta->saveQuietly();
 
             return $conta->fresh();
         });
     }
 
-    /**
-     * Quita, em uma única transação, as contas selecionadas usando a forma de
-     * pagamento realmente informada pelo operador.
-     */
     public function registrarMassa(
         array $ids,
         int $empresaId,
@@ -163,7 +145,7 @@ class ContaReceberPagamentoService
             ->values();
 
         if ($ids->isEmpty()) {
-            throw new RuntimeException('Nenhuma conta válida foi selecionada.');
+            throw new ContaReceberPagamentoException('Nenhuma conta válida foi selecionada.');
         }
 
         $formaPagamento = trim($formaPagamento);
@@ -174,8 +156,6 @@ class ContaReceberPagamentoService
                 return ['quantidade' => 0, 'total' => 0.0, 'idempotente' => true];
             }
 
-            // Mesma ordem de lock do recebimento individual: abertura primeiro,
-            // contas depois. O fechamento disputa exatamente esta linha.
             $contexto = $this->resolverCaixaAbertoComLock($empresaId);
 
             $contas = ContaReceber::query()
@@ -186,12 +166,9 @@ class ContaReceberPagamentoService
                 ->get();
 
             if ($contas->count() !== $ids->count()) {
-                throw new RuntimeException('Uma ou mais contas selecionadas não pertencem à empresa atual ou não existem.');
+                throw new ContaReceberPagamentoException('Uma ou mais contas selecionadas não pertencem à empresa atual ou não existem.');
             }
 
-            // Segunda leitura idempotente somente depois de todos os locks que
-            // serializam a operação. Impede duas requisições simultâneas com o
-            // mesmo lote de gravarem o mesmo recebimento duas vezes.
             if ($loteUuid && $this->loteMassaRegistrado($empresaId, $loteUuid, true)) {
                 return ['quantidade' => 0, 'total' => 0.0, 'idempotente' => true];
             }
@@ -247,7 +224,7 @@ class ContaReceberPagamentoService
             }
 
             if ($quantidade === 0) {
-                throw new RuntimeException('As contas selecionadas já estão quitadas.');
+                throw new ContaReceberPagamentoException('As contas selecionadas já estão quitadas.');
             }
 
             return [
@@ -263,7 +240,7 @@ class ContaReceberPagamentoService
         $user = session('user_logged');
 
         if (!$user) {
-            throw new RuntimeException('Usuário da sessão não identificado para registrar o recebimento.');
+            throw new ContaReceberPagamentoException('Usuário da sessão não identificado para registrar o recebimento.');
         }
 
         $empresaSessao = (int) (is_object($user)
@@ -275,7 +252,7 @@ class ContaReceberPagamentoService
             : ($user['id'] ?? $user['usuario_id'] ?? 0));
 
         if ($empresaSessao <= 0 || $usuarioId <= 0 || $empresaSessao !== $empresaId) {
-            throw new RuntimeException('Empresa ou usuário da sessão inválido para registrar o recebimento.');
+            throw new ContaReceberPagamentoException('Empresa ou usuário da sessão inválido para registrar o recebimento.');
         }
 
         $query = AberturaCaixa::query()
@@ -293,7 +270,7 @@ class ContaReceberPagamentoService
             ->first();
 
         if (!$abertura) {
-            throw new RuntimeException('Nenhum caixa aberto foi encontrado. O caixa pode ter sido fechado por outra operação.');
+            throw new ContaReceberPagamentoException('Nenhum caixa aberto foi encontrado. O caixa pode ter sido fechado por outra operação.');
         }
 
         return [
@@ -306,7 +283,7 @@ class ContaReceberPagamentoService
     private function validarFilialDaConta(ContaReceber $conta, AberturaCaixa $abertura): void
     {
         if ($conta->filial_id && (int) $conta->filial_id !== (int) $abertura->filial_id) {
-            throw new RuntimeException('A conta pertence a uma filial diferente do caixa atualmente aberto.');
+            throw new ContaReceberPagamentoException('A conta pertence a uma filial diferente do caixa atualmente aberto.');
         }
     }
 
@@ -320,7 +297,7 @@ class ContaReceberPagamentoService
             || !array_key_exists($formaPagamento, $formas)
             || in_array($formaPagamento, self::FORMAS_NAO_RECEBIMENTO, true)
         ) {
-            throw new RuntimeException('Forma de pagamento inválida para recebimento.');
+            throw new ContaReceberPagamentoException('Forma de pagamento inválida para recebimento.');
         }
     }
 
