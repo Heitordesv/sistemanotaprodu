@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\CaixaMovimentacaoException;
+use App\Models\Venda;
 use App\Services\VendaCaixaEdicaoService;
 use App\Services\VendaTenantGuardService;
 use Illuminate\Http\Request;
@@ -34,12 +35,25 @@ class VendaSeguraController extends VendaController
             return $this->caixaEdicao->executar(
                 (int) $id,
                 (int) $request->empresa_id,
-                function () use ($request, $id) {
+                function (Venda $venda, $abertura) use ($request, $id) {
                     // A validação e todo o update legado ficam dentro da mesma
                     // transação que mantém o lock da abertura até o commit.
                     $this->tenantGuard->prepararUpdate($request, (int) $id);
 
-                    return parent::update($request, $id);
+                    $response = parent::update($request, $id);
+
+                    if ($abertura) {
+                        // O controller legado grava get_id_user() em usuario_id.
+                        // Em uma edição administrativa isso transferiria a venda
+                        // para outro operador e a faria desaparecer do resumo do
+                        // caixa original. Mantemos o operador histórico da sessão.
+                        Venda::query()
+                            ->whereKey((int) $id)
+                            ->where('empresa_id', (int) $request->empresa_id)
+                            ->update(['usuario_id' => (int) $abertura->usuario_id]);
+                    }
+
+                    return $response;
                 }
             );
         } catch (CaixaMovimentacaoException $e) {
