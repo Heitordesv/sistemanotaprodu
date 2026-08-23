@@ -146,9 +146,7 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
             'vPag' => '40.00',
         ]);
 
-        $xml = $this->adicionarSuplementoNfceSemAssinatura(
-            $make->getXML()
-        );
+        $xml = $this->completarFixtureNfce($make->getXML());
         $schema = $this->schemaNFe400();
 
         $this->assertTrue(Validator::isValid($xml, $schema));
@@ -182,9 +180,8 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
         );
     }
 
-    private function adicionarSuplementoNfceSemAssinatura(
-        string $xml
-    ): string {
+    private function completarFixtureNfce(string $xml): string
+    {
         $dom = new DOMDocument();
         $dom->loadXML($xml);
 
@@ -192,7 +189,7 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
         $suplemento = $dom->createElementNS($namespace, 'infNFeSupl');
         $qrCode = $dom->createElementNS($namespace, 'qrCode');
         $qrCode->appendChild($dom->createCDATASection(
-            'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx?p=43211105730928000145650010000002401717268120|2|2'
+            'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx?p=43211105730928000145650010000002409717268120|3|2|11|40.00|1|000001|YWJjZA=='
         ));
         $suplemento->appendChild($qrCode);
         $suplemento->appendChild($dom->createElementNS(
@@ -200,8 +197,76 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
             'urlChave',
             'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx'
         ));
-
         $dom->documentElement->appendChild($suplemento);
+
+        // A validação é estrutural. A assinatura criptográfica real permanece
+        // responsabilidade do fluxo de transmissão com o certificado da empresa.
+        $ds = 'http://www.w3.org/2000/09/xmldsig#';
+        $signature = $dom->createElementNS($ds, 'Signature');
+        $signedInfo = $signature->appendChild(
+            $dom->createElementNS($ds, 'SignedInfo')
+        );
+
+        $canonicalization = $signedInfo->appendChild(
+            $dom->createElementNS($ds, 'CanonicalizationMethod')
+        );
+        $canonicalization->setAttribute(
+            'Algorithm',
+            'http://www.w3.org/TR/2001/REC-xml-c14n-20010315'
+        );
+
+        $signatureMethod = $signedInfo->appendChild(
+            $dom->createElementNS($ds, 'SignatureMethod')
+        );
+        $signatureMethod->setAttribute(
+            'Algorithm',
+            'http://www.w3.org/2000/09/xmldsig#rsa-sha1'
+        );
+
+        $reference = $signedInfo->appendChild(
+            $dom->createElementNS($ds, 'Reference')
+        );
+        $reference->setAttribute(
+            'URI',
+            '#NFe43211105730928000145650010000002401717268120'
+        );
+        $transforms = $reference->appendChild(
+            $dom->createElementNS($ds, 'Transforms')
+        );
+        foreach ([
+            'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+            'http://www.w3.org/TR/2001/REC-xml-c14n-20010315',
+        ] as $algorithm) {
+            $transform = $transforms->appendChild(
+                $dom->createElementNS($ds, 'Transform')
+            );
+            $transform->setAttribute('Algorithm', $algorithm);
+        }
+
+        $digestMethod = $reference->appendChild(
+            $dom->createElementNS($ds, 'DigestMethod')
+        );
+        $digestMethod->setAttribute(
+            'Algorithm',
+            'http://www.w3.org/2000/09/xmldsig#sha1'
+        );
+        $reference->appendChild(
+            $dom->createElementNS($ds, 'DigestValue', 'YWJjZA==')
+        );
+        $signature->appendChild(
+            $dom->createElementNS($ds, 'SignatureValue', 'YWJjZA==')
+        );
+        $keyInfo = $signature->appendChild(
+            $dom->createElementNS($ds, 'KeyInfo')
+        );
+        $x509Data = $keyInfo->appendChild(
+            $dom->createElementNS($ds, 'X509Data')
+        );
+        $x509Data->appendChild(
+            $dom->createElementNS($ds, 'X509Certificate', 'YWJjZA==')
+        );
+
+        $dom->documentElement->appendChild($signature);
 
         return $dom->saveXML();
     }
