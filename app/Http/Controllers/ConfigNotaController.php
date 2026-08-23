@@ -21,6 +21,10 @@ class ConfigNotaController extends Controller
 
     public function certificadosFresh(Request $request)
     {
+        if (!$request->isMethod('post')) {
+            return response()->json(['message' => 'Método não permitido.'], 405);
+        }
+
         $empresaId = (int) $request->empresa_id;
         $certificado = $this->certificates->forEmpresa($empresaId);
         $config = ConfigNota::where('empresa_id', $empresaId)->first();
@@ -30,6 +34,8 @@ class ConfigNotaController extends Controller
             $config->arquivo = $certificado->arquivo;
             $config->save();
         }
+
+        return redirect()->route('configNF.index');
     }
 
     public function removeSenha($id)
@@ -37,6 +43,12 @@ class ConfigNotaController extends Controller
         $config = ConfigNota::where('id', $id)
             ->where('empresa_id', request()->empresa_id)
             ->firstOrFail();
+
+        if (!request()->isMethod('post')) {
+            return view('config_nota.confirm_remove_password', [
+                'configId' => $config->id,
+            ]);
+        }
 
         $config->senha_remover = '';
         $config->save();
@@ -266,6 +278,10 @@ class ConfigNotaController extends Controller
     {
         $empresaId = (int) request()->empresa_id;
         $item = ConfigNota::where('empresa_id', $empresaId)->firstOrFail();
+
+        if (!request()->isMethod('post')) {
+            return view('config_nota.confirm_delete_certificate');
+        }
 
         try {
             $item->arquivo = '';
