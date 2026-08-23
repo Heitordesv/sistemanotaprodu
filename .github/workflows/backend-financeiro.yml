@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/backend-senior
+      - agent/backend-senior-pix-mercadopago
   pull_request:
     branches:
       - main
