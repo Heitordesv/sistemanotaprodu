@@ -35,6 +35,43 @@ class CaixaMovimentacaoRoutesTest extends TestCase
         $this->assertStringContainsString(FrontBoxResumoController::class, $pdvStore->getActionName());
     }
 
+    public function test_tela_caixa_nao_bloqueia_fechamento_quando_nao_ha_vendas(): void
+    {
+        $blade = (string) file_get_contents(resource_path('views/caixa/index.blade.php'));
+
+        $this->assertStringNotContainsString(
+            'Não é possível fechar o Caixa',
+            $blade,
+            'A tela /caixa não pode exigir venda para permitir o fechamento.'
+        );
+        $this->assertStringNotContainsString(
+            "sizeof(\$caixa['vendas']) == 0) disabled",
+            $blade,
+            'O botão de fechamento não pode ser desabilitado quando vendas == 0.'
+        );
+        $this->assertStringContainsString(
+            "\$caixa['dinheiroNaGaveta']",
+            $blade,
+            'A tela deve exibir o dinheiro da gaveta calculado pelo servidor.'
+        );
+        $this->assertStringContainsString(
+            "\$caixa['totalRecebimentos']",
+            $blade,
+            'A tela deve considerar recebimentos mesmo sem vendas.'
+        );
+    }
+
+    public function test_sangria_usa_dinheiro_na_gaveta_e_nao_valor_bruto_das_vendas(): void
+    {
+        $controller = (string) file_get_contents(app_path('Http/Controllers/SangriaCaixaController.php'));
+
+        $this->assertStringContainsString('CaixaResumoService', $controller);
+        $this->assertStringContainsString("['dinheiroNaGaveta']", $controller);
+        $this->assertStringNotContainsString("sum('valor_total')", $controller);
+        $this->assertStringNotContainsString('use App\\Models\\VendaCaixa;', $controller);
+        $this->assertStringNotContainsString('use App\\Models\\Venda;', $controller);
+    }
+
     public function test_fechamento_nao_redireciona_para_host_externo_informado_pelo_cliente(): void
     {
         session(['user_logged' => [
