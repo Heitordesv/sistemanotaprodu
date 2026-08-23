@@ -16,11 +16,16 @@ class Venda extends Model
         'transportadora_id', 'sequencia_cce', 'tipo_pagamento', 'empresa_id',
         'pedido_ecommerce_id', 'bandeira_cartao', 'cnpj_cartao', 'cAut_cartao',
         'descricao_pag_outros', 'acrescimo', 'data_entrega', 'pedido_nuvemshop_id',
-        'nSerie', 'data_emissao', 'filial_id'
+        'nSerie', 'data_emissao', 'filial_id', 'abertura_caixa_id'
     ];
 
     public function filial(){
         return $this->belongsTo(Filial::class, 'filial_id');
+    }
+
+    public function aberturaCaixa()
+    {
+        return $this->belongsTo(AberturaCaixa::class, 'abertura_caixa_id');
     }
     
     public function vendedor_setado()
@@ -183,7 +188,7 @@ class Venda extends Model
             $c->where('NfNumero', $numero_nfe);
         }
 
-        if ($estado != 'TODOS') $c->where('vendas.estado', $estado);
+        if ($estado != "TODOS") $c->where('vendas.estado', $estado);
         return $c->get();
     }
 
@@ -197,7 +202,7 @@ class Venda extends Model
             ->where('vendas.empresa_id', $empresa_id)
             ->where('vendas.forma_pagamento', '!=', 'conta_crediario');
 
-        if ($estado != 'TODOS') $c->where('vendas.estado', $estado);
+        if ($estado != "TODOS") $c->where('vendas.estado', $estado);
         if ($numero_nfe != "") {
             $c->where('NfNumero', $numero_nfe);
         }
@@ -217,7 +222,6 @@ class Venda extends Model
         }
         return $c->get();
     }
-
 
     public static function filtroDataApp($dataInicial, $dataFinal, $estado, $empresa_id)
     {
@@ -259,8 +263,8 @@ class Venda extends Model
         $c = Venda::select('vendas.*')
             ->join('clientes', 'clientes.id', '=', 'vendas.cliente_id')
             ->where('clientes.razao_social', 'LIKE', "%$cliente%")
-            ->where('vendas.empresa_id', $empresa_id)
-            ->where('vendas.forma_pagamento', '!=', 'conta_crediario');
+            ->where('vendas.forma_pagamento', '!=', 'conta_crediario')
+            ->where('vendas.empresa_id', $empresa_id);
 
         if ($estado != 'TODOS') $c->where('vendas.estado', $estado);
 
