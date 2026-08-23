@@ -19,6 +19,15 @@ class ResolveFiscalApiTenantContext
         ApiProdutoController::class,
     ];
 
+    /**
+     * Ações utilitárias que não leem nem gravam qualquer dado empresarial.
+     * Toda nova ação de Produto nasce protegida por padrão.
+     */
+    private const API_PRODUCT_TENANT_EXEMPT_METHODS = [
+        'getBarcode',
+        'linhaParcelaCompra',
+    ];
+
     private const APP_CONTROLLERS = [
         AppProdutoController::class,
         AppConfigEmitenteController::class,
@@ -30,7 +39,14 @@ class ResolveFiscalApiTenantContext
 
     public function handle(Request $request, Closure $next)
     {
-        [$controller] = $this->action($request);
+        [$controller, $method] = $this->action($request);
+
+        if (
+            $controller === ApiProdutoController::class &&
+            in_array($method, self::API_PRODUCT_TENANT_EXEMPT_METHODS, true)
+        ) {
+            return $next($request);
+        }
 
         if (in_array($controller, self::HASH_CONTROLLERS, true)) {
             $empresaId = $this->guard->empresaIdPorHash($request);
