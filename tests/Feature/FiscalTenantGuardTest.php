@@ -190,6 +190,7 @@ class FiscalTenantGuardTest extends TestCase
     ): Request {
         $request = Request::create($uri, $method, $input);
         $route = new Route([$method], $uri, ['uses' => $action]);
+        $route->bind($request);
 
         foreach ($routeParameters as $key => $value) {
             $route->setParameter($key, $value);
