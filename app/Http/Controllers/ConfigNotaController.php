@@ -170,7 +170,7 @@ class ConfigNotaController extends Controller
                 'senha_remover' => $request->senha_remover ? md5($request->senha_remover) : ($item->senha_remover ?? ''),
                 'background_color' => $request->background_color ?? ($item->background_color ?? '#343a40'),
                 'text_color' => $request->text_color ?? ($item->text_color ?? '#ffffff'),
-                'csc' => $request->filled('csc') ? $request->csc : ($item->csc ?? ''),
+                'csc' => ($request->filled('csc') && $request->csc !== '********') ? $request->csc : ($item->csc ?? ''),
                 'csc_id' => $request->csc_id ?? ($item->csc_id ?? ''),
                 'logo' => $logo,
             ];
@@ -291,7 +291,7 @@ class ConfigNotaController extends Controller
         $config->setAttribute('arquivo', null);
         $config->setAttribute('senha', null);
         $config->setAttribute('senha_remover', null);
-        $config->setAttribute('csc', null);
+        $config->setAttribute('csc', !empty($config->getRawOriginal('csc')) ? '********' : null);
         $config->setAttribute('token_ibpt', null);
         $config->setAttribute('token_nfse', null);
         $config->setAttribute('DeviceToken', null);
