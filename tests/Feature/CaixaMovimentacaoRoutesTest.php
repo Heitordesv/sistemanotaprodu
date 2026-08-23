@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\CaixaFechamentoController;
+use App\Http\Controllers\FrontBoxResumoController;
+use App\Http\Controllers\VendaSeguraController;
 use App\Models\AberturaCaixa;
 use App\Services\CaixaFechamentoService;
 use Illuminate\Http\Request;
@@ -16,6 +18,19 @@ class CaixaMovimentacaoRoutesTest extends TestCase
         $this->assertRouteHasMiddleware('/sangriaCaixa', 'POST', 'caixaMovimento:obrigatorio');
         $this->assertRouteHasMiddleware('/suprimentoCaixa', 'POST', 'caixaMovimento:obrigatorio');
         $this->assertRouteHasMiddleware('/vendas', 'POST', 'caixaMovimento:venda-opcional');
+    }
+
+    public function test_rotas_de_venda_e_pdv_usam_controllers_endurecidos(): void
+    {
+        $vendaStore = app('router')->getRoutes()->match(Request::create('/vendas', 'POST'));
+        $vendaUpdate = app('router')->getRoutes()->match(Request::create('/vendas/10', 'PUT'));
+        $pdvIndex = app('router')->getRoutes()->match(Request::create('/frenteCaixa', 'GET'));
+        $pdvStore = app('router')->getRoutes()->match(Request::create('/frenteCaixa', 'POST'));
+
+        $this->assertStringContainsString(VendaSeguraController::class, $vendaStore->getActionName());
+        $this->assertStringContainsString(VendaSeguraController::class, $vendaUpdate->getActionName());
+        $this->assertStringContainsString(FrontBoxResumoController::class, $pdvIndex->getActionName());
+        $this->assertStringContainsString(FrontBoxResumoController::class, $pdvStore->getActionName());
     }
 
     public function test_fechamento_nao_redireciona_para_host_externo_informado_pelo_cliente(): void
