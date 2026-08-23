@@ -59,9 +59,9 @@ class CaixaVinculoAberturaTest extends TestCase
     {
         $inicio = now()->subMinutes(30);
 
-        DB::table('abertura_caixas')->insert([
-            [
-                'id' => 100,
+        foreach ([100, 101] as $id) {
+            DB::table('abertura_caixas')->insert([
+                'id' => $id,
                 'usuario_id' => 7,
                 'valor' => 0,
                 'ultima_venda_nfe' => 0,
@@ -74,119 +74,20 @@ class CaixaVinculoAberturaTest extends TestCase
                 'filial_id' => 10,
                 'created_at' => $inicio,
                 'updated_at' => $inicio,
-            ],
-            [
-                'id' => 101,
-                'usuario_id' => 7,
-                'valor' => 0,
-                'ultima_venda_nfe' => 0,
-                'ultima_venda_nfce' => 0,
-                'empresa_id' => 1,
-                'primeira_venda_nfe' => 0,
-                'primeira_venda_nfce' => 0,
-                'status' => 0,
-                'valor_dinheiro_caixa' => 0,
-                'filial_id' => 10,
-                'created_at' => $inicio,
-                'updated_at' => $inicio,
-            ],
-        ]);
+            ]);
+        }
 
-        DB::table('vendas')->insert([
-            [
-                'id' => 1,
-                'empresa_id' => 1,
-                'usuario_id' => 7,
-                'abertura_caixa_id' => 100,
-                'tipo_pagamento' => '01',
-                'valor_total' => 10,
-                'estado_emissao' => 'aprovado',
-                'created_at' => now()->subMinutes(10),
-                'updated_at' => now()->subMinutes(10),
-            ],
-            [
-                'id' => 2,
-                'empresa_id' => 1,
-                'usuario_id' => 7,
-                'abertura_caixa_id' => 101,
-                'tipo_pagamento' => '01',
-                'valor_total' => 99,
-                'estado_emissao' => 'aprovado',
-                'created_at' => now()->subMinutes(10),
-                'updated_at' => now()->subMinutes(10),
-            ],
-            [
-                'id' => 3,
-                'empresa_id' => 1,
-                'usuario_id' => 7,
-                'abertura_caixa_id' => null,
-                'tipo_pagamento' => '01',
-                'valor_total' => 3,
-                'estado_emissao' => 'aprovado',
-                'created_at' => now()->subMinutes(10),
-                'updated_at' => now()->subMinutes(10),
-            ],
-        ]);
+        $this->inserirVenda(1, 100, 10);
+        $this->inserirVenda(2, 101, 99);
+        $this->inserirVenda(3, null, 3);
 
-        DB::table('suprimento_caixas')->insert([
-            [
-                'id' => 1,
-                'usuario_id' => 7,
-                'empresa_id' => 1,
-                'abertura_caixa_id' => 100,
-                'valor' => 5,
-                'created_at' => now()->subMinutes(5),
-                'updated_at' => now()->subMinutes(5),
-            ],
-            [
-                'id' => 2,
-                'usuario_id' => 7,
-                'empresa_id' => 1,
-                'abertura_caixa_id' => 101,
-                'valor' => 50,
-                'created_at' => now()->subMinutes(5),
-                'updated_at' => now()->subMinutes(5),
-            ],
-            [
-                'id' => 3,
-                'usuario_id' => 7,
-                'empresa_id' => 1,
-                'abertura_caixa_id' => null,
-                'valor' => 1,
-                'created_at' => now()->subMinutes(5),
-                'updated_at' => now()->subMinutes(5),
-            ],
-        ]);
+        $this->inserirMovimentacao('suprimento_caixas', 1, 100, 5);
+        $this->inserirMovimentacao('suprimento_caixas', 2, 101, 50);
+        $this->inserirMovimentacao('suprimento_caixas', 3, null, 1);
 
-        DB::table('sangria_caixas')->insert([
-            [
-                'id' => 1,
-                'usuario_id' => 7,
-                'empresa_id' => 1,
-                'abertura_caixa_id' => 100,
-                'valor' => 2,
-                'created_at' => now()->subMinutes(4),
-                'updated_at' => now()->subMinutes(4),
-            ],
-            [
-                'id' => 2,
-                'usuario_id' => 7,
-                'empresa_id' => 1,
-                'abertura_caixa_id' => 101,
-                'valor' => 20,
-                'created_at' => now()->subMinutes(4),
-                'updated_at' => now()->subMinutes(4),
-            ],
-            [
-                'id' => 3,
-                'usuario_id' => 7,
-                'empresa_id' => 1,
-                'abertura_caixa_id' => null,
-                'valor' => 0.5,
-                'created_at' => now()->subMinutes(4),
-                'updated_at' => now()->subMinutes(4),
-            ],
-        ]);
+        $this->inserirMovimentacao('sangria_caixas', 1, 100, 2);
+        $this->inserirMovimentacao('sangria_caixas', 2, 101, 20);
+        $this->inserirMovimentacao('sangria_caixas', 3, null, 0.5);
 
         $abertura = AberturaCaixa::findOrFail(100);
         $resumo = app(CaixaResumoService::class)->resumir($abertura, now());
@@ -272,6 +173,34 @@ class CaixaVinculoAberturaTest extends TestCase
         $this->assertSame(10.5, (float) $abertura->valor);
     }
 
+    private function inserirVenda(int $id, ?int $aberturaId, float $valor): void
+    {
+        DB::table('vendas')->insert([
+            'id' => $id,
+            'empresa_id' => 1,
+            'usuario_id' => 7,
+            'abertura_caixa_id' => $aberturaId,
+            'tipo_pagamento' => '01',
+            'valor_total' => $valor,
+            'estado_emissao' => 'aprovado',
+            'created_at' => now()->subMinutes(10),
+            'updated_at' => now()->subMinutes(10),
+        ]);
+    }
+
+    private function inserirMovimentacao(string $tabela, int $id, ?int $aberturaId, float $valor): void
+    {
+        DB::table($tabela)->insert([
+            'id' => $id,
+            'usuario_id' => 7,
+            'empresa_id' => 1,
+            'abertura_caixa_id' => $aberturaId,
+            'valor' => $valor,
+            'created_at' => now()->subMinutes(5),
+            'updated_at' => now()->subMinutes(5),
+        ]);
+    }
+
     private function controllerParaEmpresa(int $empresaId): AberturaCaixaController
     {
         $controller = app(AberturaCaixaController::class);
@@ -296,7 +225,7 @@ class CaixaVinculoAberturaTest extends TestCase
         });
 
         Schema::create('abertura_caixas', function (Blueprint $table) {
-            $table->unsignedBigInteger('id')->primary();
+            $table->bigIncrements('id');
             $table->unsignedBigInteger('usuario_id');
             $table->decimal('valor', 12, 2)->default(0);
             $table->unsignedBigInteger('ultima_venda_nfe')->default(0);
@@ -334,24 +263,16 @@ class CaixaVinculoAberturaTest extends TestCase
             $table->unsignedBigInteger('venda_id')->nullable();
         });
 
-        Schema::create('suprimento_caixas', function (Blueprint $table) {
-            $table->unsignedBigInteger('id')->primary();
-            $table->unsignedBigInteger('usuario_id');
-            $table->unsignedBigInteger('empresa_id');
-            $table->unsignedBigInteger('abertura_caixa_id')->nullable();
-            $table->decimal('valor', 12, 2);
-            $table->string('observacao')->nullable();
-            $table->timestamps();
-        });
-
-        Schema::create('sangria_caixas', function (Blueprint $table) {
-            $table->unsignedBigInteger('id')->primary();
-            $table->unsignedBigInteger('usuario_id');
-            $table->unsignedBigInteger('empresa_id');
-            $table->unsignedBigInteger('abertura_caixa_id')->nullable();
-            $table->decimal('valor', 12, 2);
-            $table->string('observacao')->nullable();
-            $table->timestamps();
-        });
+        foreach (['suprimento_caixas', 'sangria_caixas'] as $tabela) {
+            Schema::create($tabela, function (Blueprint $table) {
+                $table->unsignedBigInteger('id')->primary();
+                $table->unsignedBigInteger('usuario_id');
+                $table->unsignedBigInteger('empresa_id');
+                $table->unsignedBigInteger('abertura_caixa_id')->nullable();
+                $table->decimal('valor', 12, 2);
+                $table->string('observacao')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 }
