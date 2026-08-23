@@ -77,10 +77,75 @@ class PdvDevolucaoMigrationMysqlTest extends TestCase
 
         $migration->down();
 
-        // Auditoria fiscal/financeira é deliberadamente não destrutiva.
         $this->assertTrue(Schema::hasTable('pdv_devolucoes'));
         $this->assertSame(1, DB::table('pdv_devolucoes')->where('venda_caixa_id', 99)->count());
         $this->assertTrue(Schema::hasColumn('venda_caixas', 'estoque_filial_id'));
+    }
+
+    public function test_migration_financeira_adiciona_vinculo_de_estorno_sem_apagar_registros_no_down(): void
+    {
+        Schema::create('conta_recebers', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('empresa_id');
+            $table->integer('status')->default(0);
+            $table->decimal('valor_integral', 16, 7)->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('comissao_vendas', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('empresa_id');
+            $table->integer('status')->default(0);
+            $table->decimal('valor', 16, 7)->default(0);
+            $table->timestamps();
+        });
+
+        DB::table('conta_recebers')->insert([
+            'id' => 10,
+            'empresa_id' => 1,
+            'status' => 0,
+            'valor_integral' => 50,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('comissao_vendas')->insert([
+            'id' => 20,
+            'empresa_id' => 1,
+            'status' => 0,
+            'valor' => 5,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $migration = require database_path('migrations/2026_08_23_020000_add_pdv_devolucao_reversal_audit.php');
+        $migration->up();
+
+        foreach (['pdv_devolucao_id', 'cancelado_em', 'cancelado_por_usuario_id'] as $coluna) {
+            $this->assertTrue(Schema::hasColumn('conta_recebers', $coluna));
+            $this->assertTrue(Schema::hasColumn('comissao_vendas', $coluna));
+        }
+
+        DB::table('conta_recebers')->where('id', 10)->update([
+            'status' => 2,
+            'pdv_devolucao_id' => 77,
+            'cancelado_em' => now(),
+            'cancelado_por_usuario_id' => 7,
+        ]);
+        DB::table('comissao_vendas')->where('id', 20)->update([
+            'status' => 2,
+            'pdv_devolucao_id' => 77,
+            'cancelado_em' => now(),
+            'cancelado_por_usuario_id' => 7,
+        ]);
+
+        $migration->down();
+
+        $this->assertSame(1, DB::table('conta_recebers')->where('id', 10)->count());
+        $this->assertSame(1, DB::table('comissao_vendas')->where('id', 20)->count());
+        $this->assertSame(2, (int) DB::table('conta_recebers')->where('id', 10)->value('status'));
+        $this->assertSame(77, (int) DB::table('conta_recebers')->where('id', 10)->value('pdv_devolucao_id'));
+        $this->assertSame(2, (int) DB::table('comissao_vendas')->where('id', 20)->value('status'));
+        $this->assertSame(77, (int) DB::table('comissao_vendas')->where('id', 20)->value('pdv_devolucao_id'));
     }
 
     private function ledger(int $vendaId): array
@@ -104,6 +169,8 @@ class PdvDevolucaoMigrationMysqlTest extends TestCase
 
     private function limpar(): void
     {
+        Schema::dropIfExists('comissao_vendas');
+        Schema::dropIfExists('conta_recebers');
         Schema::dropIfExists('pdv_devolucoes');
         Schema::dropIfExists('autorizacoes_devolucao_caixa');
         Schema::dropIfExists('alteracao_estoques');
