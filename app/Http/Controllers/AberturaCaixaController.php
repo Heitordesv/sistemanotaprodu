@@ -46,7 +46,7 @@ class AberturaCaixaController extends Controller
                 function ($attribute, $value, $fail) {
                     $valor = trim((string) $value);
                     $formatoValido = preg_match(
-                        '/^(?:(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{1,2})?|\d+(?:\.\d{1,2})?)$/',
+                        '/^(?:(?:\d{1,3}(?:\.\d{3})+,\d{1,2})|\d+(?:,\d{1,2})?|\d+(?:\.\d{1,2})?)$/',
                         $valor
                     );
 
