@@ -79,6 +79,17 @@ class ConfigNota extends Model
         'perc_is_padrao',
     ];
 
+    protected $hidden = [
+        'arquivo',
+        'senha',
+        'senha_remover',
+        'csc',
+        'token_ibpt',
+        'token_nfse',
+        'DeviceToken',
+        'Bearer',
+    ];
+
     public static function configStatic()
     {
         $value = session('user_logged');
@@ -188,7 +199,6 @@ class ConfigNota extends Model
 
     public static function tiposFrete()
     {
-
         return [
             '0' => '0 - Emitente',
             '1' => '1 - Destinatário',
@@ -229,7 +239,6 @@ class ConfigNota extends Model
             '53' => 'DF'
         ];
     }
-
 
     public static function getUF($cUF)
     {
