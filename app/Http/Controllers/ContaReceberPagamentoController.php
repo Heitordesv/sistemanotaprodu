@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ContaReceberPagamentoException;
 use App\Jobs\EnviarConfirmaWhatsAppJobs;
 use App\Models\Cliente;
 use App\Models\ContaReceber;
@@ -11,7 +12,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use RuntimeException;
 use Throwable;
 
 class ContaReceberPagamentoController extends Controller
@@ -100,7 +100,7 @@ class ContaReceberPagamentoController extends Controller
 
             return $this->redirectSeguroDepoisDoPagamento($request)
                 ->with('flash_sucesso', $mensagem);
-        } catch (RuntimeException $e) {
+        } catch (ContaReceberPagamentoException $e) {
             Log::warning('Recebimento rejeitado por regra de negócio', [
                 'conta_id' => $item->id,
                 'empresa_id' => $item->empresa_id,
@@ -174,7 +174,7 @@ class ContaReceberPagamentoController extends Controller
                 $resultado['quantidade'] . ' conta(s) recebida(s) via ' . $forma .
                 '. Total: R$ ' . number_format($resultado['total'], 2, ',', '.')
             );
-        } catch (RuntimeException $e) {
+        } catch (ContaReceberPagamentoException $e) {
             Log::warning('Recebimento em massa rejeitado por regra de negócio', [
                 'empresa_id' => $empresaId,
                 'ids' => $ids,
