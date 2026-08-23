@@ -43,6 +43,20 @@ class ResolveFiscalApiTenantContext
         NfceAppController::class,
     ];
 
+    private const APP_VENDA_RESOURCE_METHODS = [
+        'getVenda',
+        'delete',
+        'renderizarDanfe',
+        'renderizarXml',
+    ];
+
+    private const APP_VENDA_CAIXA_RESOURCE_METHODS = [
+        'getVenda',
+        'delete',
+        'renderizarDanfe',
+        'cupomNaoFiscal',
+    ];
+
     public function __construct(private FiscalTenantGuardService $guard)
     {
     }
@@ -142,6 +156,10 @@ class ResolveFiscalApiTenantContext
             return;
         }
 
+        if (!in_array($method, self::APP_VENDA_RESOURCE_METHODS, true)) {
+            return;
+        }
+
         $vendaId = $this->resourceId($request, ['id', 'venda_id']);
 
         if ($vendaId !== null) {
@@ -154,6 +172,10 @@ class ResolveFiscalApiTenantContext
         if ($method === 'salvar') {
             $this->guard->produtos($empresaId, $this->produtoIdsDosItens($request));
             $this->guard->naturezaPadraoDaConfig($empresaId);
+            return;
+        }
+
+        if (!in_array($method, self::APP_VENDA_CAIXA_RESOURCE_METHODS, true)) {
             return;
         }
 
