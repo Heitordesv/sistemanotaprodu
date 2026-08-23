@@ -112,6 +112,26 @@ class FrontBoxController extends Controller
             ->findByBarcodeReference($request);
     }
 
+    /**
+     * A emissão iniciada pelo PDV web usa a empresa autenticada na sessão.
+     * O ResolveCashTenantContext substitui qualquer empresa_id enviado pelo
+     * navegador antes de a venda e a configuração fiscal serem consultadas.
+     */
+    public function transmitirNfce(Request $request)
+    {
+        $dados = $request->validate([
+            'id' => 'required|integer',
+        ]);
+
+        app(FiscalTenantGuardService::class)->vendaCaixa(
+            (int) $request->empresa_id,
+            (int) $dados['id']
+        );
+
+        return app(\App\Http\Controllers\API\NFCeController::class)
+            ->transmitir($request);
+    }
+
     private function validaCaixaAberto($funcionarios)
     {
         $temp = [];
