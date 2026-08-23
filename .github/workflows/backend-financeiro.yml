@@ -72,6 +72,9 @@ jobs:
       - name: Clear Laravel config
         run: php artisan config:clear
 
+      - name: Fiscal tenant isolation tests
+        run: vendor/bin/phpunit tests/Feature/FiscalTenantGuardTest.php
+
       - name: Feature tests do fluxo financeiro
         run: |
           vendor/bin/phpunit tests/Feature/CaixaRecebimentosTest.php
