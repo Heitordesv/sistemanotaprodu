@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Pdv;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\AuthPdv;
 use Illuminate\Http\Request;
 use App\Models\VendaCaixa;
 use App\Models\ItemVendaCaixa;
 use App\Models\Empresa;
 use App\Models\Funcionario;
 use App\Models\Produto;
+use App\Models\Cliente;
+use App\Models\Usuario;
 use App\Models\FaturaFrenteCaixa;
 use App\Helpers\StockMove;
 use App\Models\ComissaoVenda;
@@ -18,18 +21,46 @@ class VendaController extends Controller
     public function salvar(Request $request){
         try{
             $venda = json_decode($request->venda, true);
-            $xml = $request->xml;
-            // return response()->json($venda, 200);
-
-            $empresa = Empresa::find($request->empresa_id);
-            $vendedor = null;
-            if($venda['vendedor_id']){
-                $vendedor = Funcionario::find($venda['vendedor_id']);
+            if (!is_array($venda)) {
+                return response()->json('Venda inválida', 422);
             }
-            if($venda['rascunho'] == "false"){
+
+            $xml = $request->xml;
+            $empresaId = (int) $request->attributes->get(AuthPdv::EMPRESA_ID_ATTRIBUTE);
+            $usuarioAutenticadoId = (int) $request->attributes->get(AuthPdv::USER_ID_ATTRIBUTE);
+            $empresa = Empresa::query()->where('id', $empresaId)->firstOrFail();
+
+            $clienteId = isset($venda['cliente_id']) && (int) $venda['cliente_id'] > 0
+                ? (int) $venda['cliente_id']
+                : null;
+
+            if ($clienteId !== null) {
+                Cliente::query()
+                    ->where('empresa_id', $empresaId)
+                    ->where('id', $clienteId)
+                    ->firstOrFail();
+            }
+
+            $vendedor = null;
+            $usuarioVendaId = $usuarioAutenticadoId;
+            if (!empty($venda['vendedor_id'])) {
+                $vendedor = Funcionario::query()
+                    ->where('empresa_id', $empresaId)
+                    ->where('id', (int) $venda['vendedor_id'])
+                    ->firstOrFail();
+
+                $usuarioVendedor = Usuario::query()
+                    ->where('empresa_id', $empresaId)
+                    ->where('id', (int) $vendedor->usuario_id)
+                    ->firstOrFail();
+
+                $usuarioVendaId = (int) $usuarioVendedor->id;
+            }
+
+            if(($venda['rascunho'] ?? 'false') == "false"){
                 $result = VendaCaixa::create([
-                    'cliente_id' => isset($venda['cliente_id']) ? $venda['cliente_id'] : null,
-                    'usuario_id' => $vendedor == null ? $venda['usuario_id'] : $vendedor->usuario->id,
+                    'cliente_id' => $clienteId,
+                    'usuario_id' => $usuarioVendaId,
                     'valor_total' => $venda['valor_total'],
                     'NFcNumero' => $venda['NFcNumero'] ?? 0,
                     'natureza_id' => $empresa->configNota->natureza->id,
@@ -52,7 +83,7 @@ class VendaController extends Controller
                     'valor_pagamento_2' => 0,
                     'tipo_pagamento_3' => '',
                     'valor_pagamento_3' => 0,
-                    'empresa_id' => $empresa->id,
+                    'empresa_id' => $empresaId,
                     'bandeira_cartao' => '',
                     'cnpj_cartao' => '',
                     'cAut_cartao' => '',
@@ -62,8 +93,10 @@ class VendaController extends Controller
                     'consignado' => 0
                 ]);
             }else{
-                $result = VendaCaixa::where('id', $venda['codigo_edit'])
-                ->first();
+                $result = VendaCaixa::query()
+                    ->where('empresa_id', $empresaId)
+                    ->where('id', (int) ($venda['codigo_edit'] ?? 0))
+                    ->firstOrFail();
 
                 $result->rascunho = 0;
                 $result->valor_total = $venda['valor_total'];
@@ -75,16 +108,20 @@ class VendaController extends Controller
                 $result->itens()->delete();
             }
 
-            //salvar o xml se existe
-
+            // Mantido no escopo legado deste PR. A fonte alternativa de XML
+            // continua bloqueada para o pacote específico já planejado.
             if($xml != ""){
                 $public = env('SERVIDOR_WEB') ? 'public/' : '';
                 file_put_contents($public.'xml_nfce/'.$venda['chave'].'.xml', $xml);
             }
 
             $stockMove = new StockMove();
-            foreach($venda['itens'] as $i){
-                $produto = Produto::find($i['produto_id']);
+            foreach(($venda['itens'] ?? []) as $i){
+                $produto = Produto::query()
+                    ->where('empresa_id', $empresaId)
+                    ->where('id', (int) $i['produto_id'])
+                    ->firstOrFail();
+
                 $cfop = 0;
 
                 if($empresa->configNota->natureza->sobrescreve_cfop){
@@ -93,7 +130,7 @@ class VendaController extends Controller
                     $cfop = $produto->CFOP_saida_estadual;
                 }
                 ItemVendaCaixa::create([
-                    'produto_id' => $i['produto_id'],
+                    'produto_id' => $produto->id,
                     'venda_caixa_id' => $result->id,
                     'quantidade' => $i['quantidade'],
                     'valor' => $i['valor'],
@@ -103,7 +140,7 @@ class VendaController extends Controller
                     'valor_custo' => $produto->valor_compra
                 ]);
 
-                $stockMove->downStock($i['produto_id'],$i['quantidade']);
+                $stockMove->downStock($produto->id,$i['quantidade']);
             }
 
             if($vendedor){
@@ -116,12 +153,12 @@ class VendaController extends Controller
                         'tabela' => 'venda_caixas',
                         'valor' => $valorComissao,
                         'status' => 0,
-                        'empresa_id' => $empresa->id
+                        'empresa_id' => $empresaId
                     ]
                 );
             }
 
-            foreach($venda['fatura'] as $f){
+            foreach(($venda['fatura'] ?? []) as $f){
                 $fp = explode("-", $f['forma_pagamento'])[0];
                 FaturaFrenteCaixa::create([
                     'valor' => __replace($f['valor']),
