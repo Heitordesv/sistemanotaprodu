@@ -240,39 +240,38 @@
             </div>
 
             @if($estado)
-                @if(sizeof($caixa['vendas'] ?? []) == 0)
-                    <div class="alert alert-warning mt-3">
-                        Não é possível fechar o Caixa #{{ $abertura->id }} sem nenhuma venda.
-                    </div>
-                @else
-                    <div class="mt-3">
-                        <h5 class="text-warning">
-                            Soma de vendas: <strong>R$ {{ __moeda($soma) }}</strong>
-                        </h5>
-                        <h5 class="text-info">
-                            Total caixa em dinheiro:
-                            <strong>R$ {{ __moeda(($somaDinheiro + $somaSuprimento + $abertura->valor) - $somaSangria) }}</strong>
-                        </h5>
-                        <h5 class="text-success">
-                            Total geral:
-                            <strong>R$ {{ __moeda(($soma + $somaSuprimento + $abertura->valor) - $somaSangria) }}</strong>
-                        </h5>
-                    </div>
-                @endif
+                <div class="mt-3">
+                    <h5 class="text-warning">
+                        Soma de vendas: <strong>R$ {{ __moeda($soma) }}</strong>
+                    </h5>
+                    <h5 class="text-primary">
+                        Recebimentos de contas:
+                        <strong>R$ {{ __moeda($caixa['totalRecebimentos'] ?? 0) }}</strong>
+                    </h5>
+                    <h5 class="text-info">
+                        Dinheiro na gaveta:
+                        <strong>R$ {{ __moeda($caixa['dinheiroNaGaveta'] ?? 0) }}</strong>
+                    </h5>
+                    <h5 class="text-success">
+                        Resultado financeiro:
+                        <strong>R$ {{ __moeda($caixa['resultadoFinanceiro'] ?? 0) }}</strong>
+                    </h5>
+                </div>
             @endif
 
             <div class="row mt-3">
                 <div class="col-12">
-                    <input type="hidden" name="valor_dinheiro_caixa" id="valor_dinheiro_caixa">
+                    <input
+                        type="hidden"
+                        name="valor_dinheiro_caixa"
+                        id="valor_dinheiro_caixa"
+                        value="{{ $caixa['dinheiroNaGaveta'] ?? 0 }}"
+                    >
                     <input type="hidden" name="abertura_id" value="{{ $abertura != null ? $abertura->id : 0 }}">
                     <input type="hidden" name="redirect" value="/caixa">
 
                     @if($estado)
-                        <button
-                            type="submit"
-                            @if(sizeof($caixa) == 0 || sizeof($caixa['vendas']) == 0) disabled @endif
-                            class="btn btn-lg btn-danger"
-                        >
+                        <button type="submit" class="btn btn-lg btn-danger">
                             <i class="bx bx-x"></i>
                             Fechar somente o Caixa #{{ $abertura->id }}
                         </button>
