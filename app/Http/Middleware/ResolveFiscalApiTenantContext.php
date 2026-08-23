@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Http\Controllers\API\NFCeController;
 use App\Http\Controllers\API\NFeController;
 use App\Http\Controllers\API\ProdutoController as ApiProdutoController;
+use App\Http\Controllers\AppFiscal\ConfigEmitenteController as AppConfigEmitenteController;
 use App\Http\Controllers\AppFiscal\ProdutoController as AppProdutoController;
 use App\Services\FiscalTenantGuardService;
 use Closure;
@@ -16,6 +17,11 @@ class ResolveFiscalApiTenantContext
         NFeController::class,
         NFCeController::class,
         ApiProdutoController::class,
+    ];
+
+    private const APP_CONTROLLERS = [
+        AppProdutoController::class,
+        AppConfigEmitenteController::class,
     ];
 
     public function __construct(private FiscalTenantGuardService $guard)
@@ -33,12 +39,15 @@ class ResolveFiscalApiTenantContext
             return $next($request);
         }
 
-        if ($controller === AppProdutoController::class) {
+        if (in_array($controller, self::APP_CONTROLLERS, true)) {
             $empresaId = $this->guard->empresaIdPorTokenApp($request);
-            $produtoId = $this->resourceId($request, true);
 
-            if ($produtoId !== null) {
-                $this->guard->produto($empresaId, $produtoId);
+            if ($controller === AppProdutoController::class) {
+                $produtoId = $this->resourceId($request, true);
+
+                if ($produtoId !== null) {
+                    $this->guard->produto($empresaId, $produtoId);
+                }
             }
         }
 
