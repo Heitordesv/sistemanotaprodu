@@ -38,7 +38,7 @@ class SegurancaOperacionalTest extends TestCase
         $this->assertContains('limiteArmazenamento', $middlewares);
     }
 
-    public function test_controller_rejeita_usuario_sem_perfil_administrativo(): void
+    public function test_controller_rejeita_usuario_comum(): void
     {
         session(['user_logged' => [
             'id' => 7,
@@ -48,18 +48,31 @@ class SegurancaOperacionalTest extends TestCase
         ]]);
 
         $this->expectException(HttpException::class);
-        $this->expectExceptionCode(0);
 
         (new OperacionalSeguroController())->limparCache(Request::create('/limpar-cache', 'POST'));
     }
 
-    public function test_admin_pode_limpar_cache_sem_expor_saida_interna(): void
+    public function test_admin_de_empresa_sem_super_tambem_e_rejeitado(): void
     {
         session(['user_logged' => [
             'id' => 7,
             'empresa' => 1,
             'adm' => 1,
             'super' => 0,
+        ]]);
+
+        $this->expectException(HttpException::class);
+
+        (new OperacionalSeguroController())->limparCache(Request::create('/limpar-cache', 'POST'));
+    }
+
+    public function test_super_usuario_pode_limpar_cache_sem_expor_saida_interna(): void
+    {
+        session(['user_logged' => [
+            'id' => 7,
+            'empresa' => 1,
+            'adm' => 1,
+            'super' => 1,
         ]]);
 
         Artisan::shouldReceive('call')
@@ -80,7 +93,7 @@ class SegurancaOperacionalTest extends TestCase
             'id' => 7,
             'empresa' => 1,
             'adm' => 1,
-            'super' => 0,
+            'super' => 1,
         ]]);
 
         Artisan::shouldReceive('call')
