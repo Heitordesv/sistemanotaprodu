@@ -146,6 +146,13 @@ class NFCeFiscalAdjustmentXmlTest extends TestCase
             'vPag' => '40.00',
         ]);
 
+        // Em produção o suplemento é preenchido após a assinatura. Neste teste
+        // sem certificado ele é informado para validar o XML completo da NFC-e.
+        $make->taginfNFeSupl((object) [
+            'qrcode' => 'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx?p=43211105730928000145650010000002401717268120|2|2',
+            'urlChave' => 'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx',
+        ]);
+
         $xml = $make->getXML();
         $schema = $this->schemaNFe400();
 
