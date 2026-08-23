@@ -35,7 +35,7 @@ class ResolveFiscalApiTenantContext
 
         if ($controller === AppProdutoController::class) {
             $empresaId = $this->guard->empresaIdPorTokenApp($request);
-            $produtoId = $this->resourceId($request);
+            $produtoId = $this->resourceId($request, true);
 
             if ($produtoId !== null) {
                 $this->guard->produto($empresaId, $produtoId);
@@ -47,7 +47,8 @@ class ResolveFiscalApiTenantContext
 
     private function validarRecursoFiscal(Request $request, string $controller, int $empresaId): void
     {
-        $resourceId = $this->resourceId($request);
+        $isProduto = $controller === ApiProdutoController::class;
+        $resourceId = $this->resourceId($request, $isProduto);
 
         if ($resourceId === null) {
             return;
@@ -57,7 +58,7 @@ class ResolveFiscalApiTenantContext
             $this->guard->venda($empresaId, $resourceId);
         } elseif ($controller === NFCeController::class) {
             $this->guard->vendaCaixa($empresaId, $resourceId);
-        } elseif ($controller === ApiProdutoController::class) {
+        } elseif ($isProduto) {
             $this->guard->produto($empresaId, $resourceId);
         }
     }
@@ -73,11 +74,17 @@ class ResolveFiscalApiTenantContext
         return explode('@', $actionName, 2);
     }
 
-    private function resourceId(Request $request): ?int
+    private function resourceId(Request $request, bool $includeProductInputs = false): ?int
     {
-        $inputId = $request->input('id');
-        if ($this->positiveInteger($inputId)) {
-            return (int) $inputId;
+        $candidateKeys = $includeProductInputs
+            ? ['id', 'product_id', 'produto_id']
+            : ['id'];
+
+        foreach ($candidateKeys as $key) {
+            $value = $request->input($key);
+            if ($this->positiveInteger($value)) {
+                return (int) $value;
+            }
         }
 
         foreach ((array) optional($request->route())->parameters() as $value) {
