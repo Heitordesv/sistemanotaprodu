@@ -212,6 +212,7 @@ public function gerarNFCe($venda){
 		$somaTotTrib = 0;
 
 		$fontesIbpt = [];
+		$ufIbpt = (new FiscalIssuerUfService())->resolve($config);
 
 		foreach($venda->itens as $i){
 			$itemCont++;
@@ -236,7 +237,7 @@ public function gerarNFCe($venda){
 			$ncm = $i->produto->NCM;
 			$ncm = str_replace(".", "", $ncm);
 			$stdProd->NCM = $ncm;
-			$ibpt = $i->produto->ibpt ?? IBPT::getIBPT($config->UF, $ncm);
+			$ibpt = $i->produto->ibpt ?? IBPT::getIBPT($ufIbpt, $ncm);
 
 			$stdProd->CFOP = $i->produto->CFOP_saida_estadual;
 
