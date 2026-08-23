@@ -16,14 +16,13 @@ use Illuminate\Validation\ValidationException;
 
 class PdvDevolucaoFinanceiroService
 {
+    private const STATUS_CANCELADO_POR_DEVOLUCAO = 2;
+
     public function __construct(
         private MovimentacaoFinanceiraCaixaService $movimentacaoCaixa
     ) {
     }
 
-    /**
-     * Validação usada ANTES de chamar a SEFAZ. Não altera dados.
-     */
     public function validarPreCondicoes(VendaCaixa $venda, Usuario $operador): array
     {
         $snapshot = $this->snapshot($venda, false);
@@ -33,11 +32,6 @@ class PdvDevolucaoFinanceiroService
         return $snapshot;
     }
 
-    /**
-     * Neutraliza somente pendências ainda não liquidadas e cria compensação de
-     * caixa quando a venda pertence a um caixa já fechado. Deve rodar dentro de
-     * transação e com a VendaCaixa bloqueada pelo orquestrador.
-     */
     public function processar(
         VendaCaixa $venda,
         PdvDevolucao $devolucao,
@@ -53,9 +47,6 @@ class PdvDevolucaoFinanceiroService
                 throw $e;
             }
 
-            // A SEFAZ já é fonte de verdade e não existe rollback remoto. Em uma
-            // corrida excepcional com recebimento/comissão, mantemos tudo intacto
-            // e marcamos reconciliação financeira pendente em vez de apagar histórico.
             return [
                 'pendente' => true,
                 'motivo_pendencia' => $e->getMessage(),
@@ -84,24 +75,7 @@ class PdvDevolucaoFinanceiroService
             ];
         }
 
-        // Conta ainda não recebida: deixa de existir como obrigação ativa. A cópia
-        // integral permanece no financeiro_json do ledger da devolução.
-        if (!empty($snapshot['conta_ids'])) {
-            ContaReceber::query()
-                ->where('empresa_id', (int) $venda->empresa_id)
-                ->whereIn('id', $snapshot['conta_ids'])
-                ->where('valor_recebido', '<=', 0)
-                ->delete();
-        }
-
-        // Comissão somente pendente pode ser neutralizada automaticamente.
-        if (!empty($snapshot['comissao_ids'])) {
-            ComissaoVenda::query()
-                ->where('empresa_id', (int) $venda->empresa_id)
-                ->whereIn('id', $snapshot['comissao_ids'])
-                ->where('status', 0)
-                ->delete();
-        }
+        $this->estornarPendencias($venda, $devolucao, $operador, $snapshot);
 
         $aberturaCompensacaoId = null;
         if ($caixa['criar_sangria']) {
@@ -134,6 +108,57 @@ class PdvDevolucaoFinanceiroService
         ];
     }
 
+    private function estornarPendencias(
+        VendaCaixa $venda,
+        PdvDevolucao $devolucao,
+        Usuario $operador,
+        array $snapshot
+    ): void {
+        $this->garantirColunasAuditoria();
+
+        $auditoria = [
+            'status' => self::STATUS_CANCELADO_POR_DEVOLUCAO,
+            'pdv_devolucao_id' => (int) $devolucao->id,
+            'cancelado_em' => now(),
+            'cancelado_por_usuario_id' => (int) $operador->id,
+            'updated_at' => now(),
+        ];
+
+        if (!empty($snapshot['conta_ids'])) {
+            ContaReceber::query()
+                ->where('empresa_id', (int) $venda->empresa_id)
+                ->whereIn('id', $snapshot['conta_ids'])
+                ->where('valor_recebido', '<=', 0)
+                ->where('status', 0)
+                ->update($auditoria);
+        }
+
+        if (!empty($snapshot['comissao_ids'])) {
+            ComissaoVenda::query()
+                ->where('empresa_id', (int) $venda->empresa_id)
+                ->whereIn('id', $snapshot['comissao_ids'])
+                ->where('status', 0)
+                ->update($auditoria);
+        }
+    }
+
+    private function garantirColunasAuditoria(): void
+    {
+        foreach (['conta_recebers', 'comissao_vendas'] as $tabela) {
+            if (!Schema::hasTable($tabela)) {
+                continue;
+            }
+
+            foreach (['pdv_devolucao_id', 'cancelado_em', 'cancelado_por_usuario_id'] as $coluna) {
+                if (!Schema::hasColumn($tabela, $coluna)) {
+                    throw ValidationException::withMessages([
+                        'financeiro' => 'A estrutura de auditoria da devolução financeira ainda não foi aplicada. Execute as migrations antes de processar devoluções.',
+                    ]);
+                }
+            }
+        }
+    }
+
     private function snapshot(VendaCaixa $venda, bool $lock): array
     {
         $contasQuery = ContaReceber::query()
@@ -161,10 +186,7 @@ class PdvDevolucaoFinanceiroService
         $historicoRecebido = 0.0;
         $contaIds = $contas->pluck('id')->map(fn ($id) => (int) $id)->values();
 
-        if (
-            $contaIds->isNotEmpty()
-            && Schema::hasTable('conta_receber_recebimentos')
-        ) {
+        if ($contaIds->isNotEmpty() && Schema::hasTable('conta_receber_recebimentos')) {
             $historicoRecebido = (float) DB::table('conta_receber_recebimentos')
                 ->where('empresa_id', (int) $venda->empresa_id)
                 ->whereIn('conta_receber_id', $contaIds->all())
@@ -185,7 +207,7 @@ class PdvDevolucaoFinanceiroService
             'comissao_ids' => $comissoes->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             'valor_recebido' => (float) $contas->sum('valor_recebido'),
             'historico_recebido' => $historicoRecebido,
-            'comissao_liquidada' => $comissoes->contains(fn ($comissao) => (int) $comissao->status !== 0),
+            'comissao_liquidada' => $comissoes->contains(fn ($comissao) => (int) $comissao->status === 1),
             'valor_dinheiro' => round(max(0, $valorDinheiro), 2),
             'contas' => $contas->map(fn ($conta) => [
                 'id' => (int) $conta->id,
@@ -251,8 +273,6 @@ class PdvDevolucaoFinanceiroService
                 ]);
             }
 
-            // Mesmo caixa ainda aberto: ao cancelar a venda, ela deixa de compor o
-            // próprio resumo; criar sangria aqui descontaria o dinheiro duas vezes.
             return [
                 'pendente' => false,
                 'motivo_pendencia' => null,
@@ -304,7 +324,6 @@ class PdvDevolucaoFinanceiroService
                 ->first();
         }
 
-        // Fallback somente para registros legados sem FK de abertura.
         return AberturaCaixa::query()
             ->where('empresa_id', (int) $venda->empresa_id)
             ->where('usuario_id', (int) $venda->usuario_id)
