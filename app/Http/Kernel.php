@@ -77,6 +77,7 @@ class Kernel extends HttpKernel
         'verificaEmpresa' => \App\Http\Middleware\VerificaEmpresa::class,
         'validaEmpresa' => \App\Http\Middleware\ValidaEmpresa::class,
         'validaAcesso' => \App\Http\Middleware\ValidaAcesso::class,
+        'caixaMovimento' => \App\Http\Middleware\LockCaixaAbertoParaMovimentacao::class,
 
         'limiteProdutos' => \App\Http\Middleware\LimiteProdutos::class,
         'limiteClientes' => \App\Http\Middleware\LimiteClientes::class,

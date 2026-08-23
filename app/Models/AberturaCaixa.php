@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CaixaResumoService;
 use Illuminate\Database\Eloquent\Model;
 
 class AberturaCaixa extends Model
@@ -18,6 +19,23 @@ class AberturaCaixa extends Model
         'valor_dinheiro_caixa',
         'filial_id',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (AberturaCaixa $abertura) {
+            if (!$abertura->isDirty('status') || (int) $abertura->status !== 1) {
+                return;
+            }
+
+            $resumo = app(CaixaResumoService::class)->resumir($abertura, now());
+            $abertura->valor_dinheiro_caixa = $resumo['dinheiroNaGaveta'];
+        });
+    }
+
+    public function resumoCaixa($fim = null): array
+    {
+        return app(CaixaResumoService::class)->resumir($this, $fim);
+    }
 
     /**
      * O próprio ID da abertura identifica a sessão operacional do caixa.
