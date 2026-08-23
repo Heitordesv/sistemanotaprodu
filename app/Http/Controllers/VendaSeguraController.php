@@ -66,6 +66,10 @@ class VendaSeguraController extends VendaController
 
     private function respostaConflitoCaixa(Request $request, CaixaMovimentacaoException $e)
     {
+        // O controller legado pode ter preparado flash de sucesso antes de a
+        // camada externa detectar uma quebra de invariantes e fazer rollback.
+        session()->forget('flash_sucesso');
+
         if ($request->expectsJson()) {
             return response()->json(['message' => $e->getMessage()], 409);
         }
