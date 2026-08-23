@@ -13,7 +13,7 @@ class VendaCaixa extends Model
 		'dinheiro_recebido', 'troco', 'nome', 'cpf', 'observacao', 'desconto', 'acrescimo',
 		'pedido_delivery_id', 'empresa_id', 'bandeira_cartao',
 		'cnpj_cartao', 'cAut_cartao', 'descricao_pag_outros', 'rascunho', 'consignado', 'pdv_java',
-		'retorno_estoque', 'qr_code_base64', 'filial_id', 'abertura_caixa_id'
+		'retorno_estoque', 'qr_code_base64', 'filial_id', 'abertura_caixa_id', 'estoque_filial_id'
 	];
 
 
@@ -101,7 +101,7 @@ class VendaCaixa extends Model
 			'07' => 'Hipercard',
 			'08' => 'Aura',
 			'09' => 'Cabal',
-			'99' => 'Outros'
+			'99' => 'Outros',
 		];
 	}
 
@@ -119,159 +119,14 @@ class VendaCaixa extends Model
 		}
 	}
 
-	public static function lastNFCe($empresa_id = null){
-		if($empresa_id == null){
-			$value = session('user_logged');
-			$empresa_id = $value['empresa'];
-		}else{
-			$empresa_id = $empresa_id;
-		}
-
-		$venda = VendaCaixa::
-		where('numero_nfce', '!=', 0)
-		->where('empresa_id', $empresa_id)
-		->orderBy('numero_nfce', 'desc')
-		->first();
-
-		if($venda == null) {
-			return ConfigNota::
-			where('empresa_id', $empresa_id)
-			->first()->ultimo_numero_nfce;
-		}
-		else{
-			$configNum = ConfigNota::
-			where('empresa_id', $empresa_id)->first()->ultimo_numero_nfce;
-			return $configNum > $venda->numero_nfce ? $configNum : $venda->numero_nfce;
-		}
-	}
-
-	public static function filtroData($dataInicial, $dataFinal, $config){
-		$value = session('user_logged');
-		$empresa_id = $value['empresa'];
-
-		return VendaCaixa::
-		orderBy('id', 'desc')
-		->whereBetween('data_registro', [$dataInicial,
-			$dataFinal])
-		->where('empresa_id', $empresa_id)
-		->when($config->caixa_por_usuario == 1, function ($q) use ($config) {
-			return $q->where('usuario_id', get_id_user());
-		})
-		->get();
-	}
-
-	public static function filtroCliente($cliente){
-
-		$value = session('user_logged');
-		$empresa_id = $value['empresa'];
-
-		return VendaCaixa::
-		join('clientes', 'clientes.id' , '=', 'venda_caixas.cliente_id')
-		->where('clientes.razao_social', 'LIKE', "%$cliente%")
-		->where('venda_caixas.empresa_id', $empresa_id)
-		->get();
-	}
-
-	public static function filtroData2($data){
-
-		$value = session('user_logged');
-		$empresa_id = $value['empresa'];
-		$data = str_replace("/", "-", $data);
-		$data = \Carbon\Carbon::parse($data)->format('Y-m-d');
-
-		return VendaCaixa::
-		whereBetween('created_at', [
-			$data . " 00:00:00",
-			$data . " 23:59:59",
-		])
-		->where('empresa_id', $empresa_id)
-		->get();
-	}
-
-	public static function filtroNFCe($nfce){
-
-		$value = session('user_logged');
-		$empresa_id = $value['empresa'];
-
-		return VendaCaixa::
-		where('NFcNumero', $nfce)
-		->where('empresa_id', $empresa_id)
-		->get();
-	}
-
-	public static function filtroValor($valor){
-
-		$value = session('user_logged');
-		$empresa_id = $value['empresa'];
-		return VendaCaixa::
-		where('valor_total', 'LIKE', "%$valor%")
-		->where('empresa_id', $empresa_id)
-		->get();
-	}
-
-	public static function filtroEstado($estado){
-
-		$value = session('user_logged');
-		$empresa_id = $value['empresa'];
-		$c = VendaCaixa::
-		where('estado_emissao', $estado)
-		->where('empresa_id', $empresa_id)
-		->where('forma_pagamento', '!=', 'conta_crediario');
-		return $c->get();
-	}
-
-	public static function filtroDataApp($dataInicial, $dataFinal, $empresa_id){
-
-		return VendaCaixa::
-		orderBy('id', 'desc')
-		->whereBetween('data_registro', [$dataInicial,
-			$dataFinal])
-		->where('empresa_id', $empresa_id)
-		->get();
-	}
-
-	public static function filtroEstadoApp($estado, $empresa_id){
-		$c = VendaCaixa::
-		where('estado_emissao', $estado)
-		->where('empresa_id', $empresa_id)
-		->where('forma_pagamento', '!=', 'conta_crediario');
-		return $c->get();
-	}
-
-	public function multiplo(){
-		$text = '';
-		// if($this->valor_pagamento_1 > 0){
-		// 	$text .= VendaCaixa::getTipoPagamento($this->tipo_pagamento_1) . ' - R$ ' . number_format($this->valor_pagamento_1, 2);
-		// }
-
-		// if($this->valor_pagamento_2 > 0){
-		// 	$text .= ' | '.VendaCaixa::getTipoPagamento($this->tipo_pagamento_2) . ' - R$ ' . number_format($this->valor_pagamento_2, 2);
-		// }
-
-		// if($this->valor_pagamento_3 > 0){
-		// 	$text .= ' | '.VendaCaixa::getTipoPagamento($this->tipo_pagamento_3) . ' - R$ ' . number_format($this->valor_pagamento_3, 2);
-		// }
-
-		foreach($this->fatura as $key => $f){
-			$text .= ($key > 0 ? ' | ' : '') .VendaCaixa::getTipoPagamento($f->forma_pagamento) . ' - R$ ' . number_format($f->valor, 2);
-		}
-		return $text;
-	}
-
 	public static function tiposPagamentoMulti(){
 		return [
-			'DINHEIRO',
-			'CARTÃO DE DÉBITO',
-			'CARTÃO DE CRÉDITO',
-			'VALE REFEIÇÃO'
+			'01' => 'Dinheiro',
+			'03' => 'Cartão de Crédito',
+			'04' => 'Cartão de Débito',
+			'06' => 'Crediário',
+			'17' => 'PIX',
+			'99' => 'Outros',
 		];
 	}
-
-	public function isComprovanteAssessor(){
-		foreach($this->itens as $i){
-			if($i->valor_comissao_assessor > 0) return true;
-		}
-		return false;
-	}
-
 }
