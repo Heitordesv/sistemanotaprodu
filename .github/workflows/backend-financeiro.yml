@@ -87,6 +87,7 @@ jobs:
           vendor/bin/phpunit tests/Feature/VendaErroSeguroTest.php
           vendor/bin/phpunit tests/Feature/MercadoPagoConciliacaoDeterministicaTest.php
           vendor/bin/phpunit tests/Feature/PdvDevolucaoSeguraRoutesTest.php
+          vendor/bin/phpunit tests/Feature/FrontBoxEstoqueFilialPersistenciaTest.php
           vendor/bin/phpunit tests/Feature/PdvDevolucaoServiceTest.php
           vendor/bin/phpunit tests/Feature/PdvDevolucaoFinanceiroServiceTest.php
           vendor/bin/phpunit tests/Feature/PdvDevolucaoEstoqueFilialTest.php
