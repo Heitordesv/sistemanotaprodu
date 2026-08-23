@@ -90,6 +90,7 @@ jobs:
           vendor/bin/phpunit tests/Feature/PdvDevolucaoServiceTest.php
           vendor/bin/phpunit tests/Feature/PdvDevolucaoFinanceiroServiceTest.php
           vendor/bin/phpunit tests/Feature/PdvDevolucaoEstoqueFilialTest.php
+          vendor/bin/phpunit tests/Feature/NFCeCancelamentoSeguroServiceTest.php
           vendor/bin/phpunit tests/Unit/NFCeConsultaCancelamentoParserTest.php
 
       - name: MySQL InnoDB concurrency and migration tests
