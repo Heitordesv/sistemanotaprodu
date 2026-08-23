@@ -206,10 +206,11 @@ public function gerarNFCe($venda){
 		);
 		$VBC = 0;
 
-		$somaFederal = 0;
-		$somaEstadual = 0;
-		$somaMunicipal = 0;
-		$somaTotTrib = 0;
+		$somaFederalCentavos = 0;
+		$somaEstadualCentavos = 0;
+		$somaMunicipalCentavos = 0;
+		$somaTotTribCentavos = 0;
+		$calculadoraTributos = new NFCeApproximateTaxService();
 
 		$fontesIbpt = [];
 		$ufIbpt = (new FiscalIssuerUfService())->resolve($config);
@@ -308,7 +309,7 @@ public function gerarNFCe($venda){
 			$stdImposto = new \stdClass();
 			$stdImposto->item = $itemCont;
 
-			$vTotTribItem = 0;
+			$vTotTribItemCentavos = 0;
 
 			if($ibpt != null){
 				$vProd = $stdProd->vProd;
@@ -316,17 +317,17 @@ public function gerarNFCe($venda){
 				$aliqEstadual = $ibpt->estadual ?? 0;
 				$aliqMunicipal = $ibpt->municipal ?? 0;
 
-				$federal = $this->format(($vProd * ($aliqNacional / 100)), 2);
-				$somaFederal += $federal;
-
-				$estadual = $this->format(($vProd * ($aliqEstadual / 100)), 2);
-				$somaEstadual += $estadual;
-
-				$municipal = $this->format(($vProd * ($aliqMunicipal / 100)), 2);
-				$somaMunicipal += $municipal;
-
-				$vTotTribItem = $federal + $estadual + $municipal;
-				$somaTotTrib += $vTotTribItem;
+				$tributosItem = $calculadoraTributos->calcularItem(
+					(float) $vProd,
+					(float) $aliqNacional,
+					(float) $aliqEstadual,
+					(float) $aliqMunicipal
+				);
+				$somaFederalCentavos += $tributosItem['federal_centavos'];
+				$somaEstadualCentavos += $tributosItem['estadual_centavos'];
+				$somaMunicipalCentavos += $tributosItem['municipal_centavos'];
+				$vTotTribItemCentavos = $tributosItem['total_centavos'];
+				$somaTotTribCentavos += $vTotTribItemCentavos;
 
 				$fonteIbpt = trim((string) ($ibpt->fonte ?? $ibpt->versao ?? ''));
 				if($fonteIbpt !== ''){
@@ -334,7 +335,8 @@ public function gerarNFCe($venda){
 				}
 			}
 
-			$imposto = $nfe->tagimposto($stdImposto, $this->format($vTotTribItem));
+			$stdImposto->vTotTrib = $calculadoraTributos->formatarCentavos($vTotTribItemCentavos);
+			$imposto = $nfe->tagimposto($stdImposto);
 
 			if($tributacao->regime == 1){ // regime normal
 				$stdICMS = new \stdClass();
@@ -444,7 +446,7 @@ public function gerarNFCe($venda){
 		$stdICMSTot->vCOFINS = $this->format($somaCOFINS);
 		$stdICMSTot->vOutro = $this->format($venda->acrescimo);
 		$stdICMSTot->vNF = $this->format($venda->valor_total);
-		$stdICMSTot->vTotTrib = $this->format($somaTotTrib);
+		$stdICMSTot->vTotTrib = $calculadoraTributos->formatarCentavos($somaTotTribCentavos);
 
 		$stdICMSTot->vIBS = $this->format($somaIBS);
 		$stdICMSTot->vCBS = $this->format($somaCBS);
@@ -533,10 +535,10 @@ public function gerarNFCe($venda){
 		// INFORMAÇÃO ADICIONAL EXIBIDA NO BLOCO DE TRIBUTOS DO DANFC-e.
 		$stdInfoAdic = new \stdClass();
 		$stdInfoAdic->infCpl = (new NFCeTaxReceiptTextService())->formatar([
-			'federal' => $somaFederal,
-			'estadual' => $somaEstadual,
-			'municipal' => $somaMunicipal,
-			'total' => $somaTotTrib,
+			'federal' => $somaFederalCentavos / 100,
+			'estadual' => $somaEstadualCentavos / 100,
+			'municipal' => $somaMunicipalCentavos / 100,
+			'total' => $somaTotTribCentavos / 100,
 			'icms' => $somaICMS,
 			'pis' => $somaPIS,
 			'cofins' => $somaCOFINS,
