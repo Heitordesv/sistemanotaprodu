@@ -162,7 +162,7 @@ class FiscalSecretsSecurityTest extends TestCase
         $this->assertStringNotContainsString("public_path('certificados')", $source);
         $this->assertStringContainsString("storage_path('app/private/certificados/'", $source);
         $this->assertStringContainsString("->where('empresa_id', request()->empresa_id)", $source);
-        $this->assertStringContainsString("$request->csc !== '********'", $source);
+        $this->assertStringContainsString("\$request->csc !== '********'", $source);
     }
 
     private function removeTestPrivateDirectory(int $empresaId): void
