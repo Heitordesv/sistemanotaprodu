@@ -56,6 +56,15 @@ jobs:
           extensions: mbstring, gd, pdo_mysql, sqlite3, pcntl, xml, curl, zip
           coverage: none
 
+      - name: Prepare Laravel writable directories
+        run: |
+          mkdir -p bootstrap/cache
+          mkdir -p storage/framework/cache
+          mkdir -p storage/framework/sessions
+          mkdir -p storage/framework/views
+          mkdir -p storage/logs
+          chmod -R ug+rwX bootstrap/cache storage
+
       - name: Install Composer dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
 
@@ -67,6 +76,7 @@ jobs:
           vendor/bin/phpunit
           tests/Feature/CaixaRecebimentosTest.php
           tests/Feature/CaixaVinculoAberturaTest.php
+          tests/Feature/VendaTenantIsolationTest.php
           tests/Feature/CaixaMovimentacaoRoutesTest.php
           tests/Feature/ContaReceberPagamentoConcorrenciaTest.php
           tests/Feature/ContaReceberPagamentoIdempotenciaTest.php
