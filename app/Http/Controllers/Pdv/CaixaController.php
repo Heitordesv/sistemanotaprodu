@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pdv;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\AuthPdv;
 use Illuminate\Http\Request;
 use App\Models\AberturaCaixa;
 use App\Models\Venda;
@@ -10,15 +11,20 @@ use App\Models\VendaCaixa;
 
 class CaixaController extends Controller
 {
-    public function index($usuario_id){
-        $ab = AberturaCaixa::where('ultima_venda_nfce', 0)
+    public function index(Request $request, $usuario_id){
+        $usuarioId = (int) $request->attributes->get(AuthPdv::USER_ID_ATTRIBUTE);
+        $empresaId = (int) $request->attributes->get(AuthPdv::EMPRESA_ID_ATTRIBUTE);
+
+        $ab = AberturaCaixa::where('empresa_id', $empresaId)
+        ->where('ultima_venda_nfce', 0)
         ->where('status', 0)
-        ->where('usuario_id', $usuario_id)
+        ->where('usuario_id', $usuarioId)
         ->orderBy('id', 'desc')->first();
 
-        $ab2 = AberturaCaixa::where('ultima_venda_nfe', 0)
+        $ab2 = AberturaCaixa::where('empresa_id', $empresaId)
+        ->where('ultima_venda_nfe', 0)
         ->where('status', 0)
-        ->where('usuario_id', $usuario_id)
+        ->where('usuario_id', $usuarioId)
         ->orderBy('id', 'desc')->first();
 
         if($ab != null && $ab2 == null){
@@ -42,18 +48,21 @@ class CaixaController extends Controller
 
     public function abrir(Request $request){
         try{
+            $empresaId = (int) $request->attributes->get(AuthPdv::EMPRESA_ID_ATTRIBUTE);
+            $usuarioId = (int) $request->attributes->get(AuthPdv::USER_ID_ATTRIBUTE);
+
             $ultimaVendaNfce = VendaCaixa::
-            where('empresa_id', $request->empresa_id)
+            where('empresa_id', $empresaId)
             ->orderBy('id', 'desc')->first();
 
             $ultimaVendaNfe = Venda::
-            where('empresa_id', $request->empresa_id)
+            where('empresa_id', $empresaId)
             ->orderBy('id', 'desc')->first();
 
             $result = AberturaCaixa::create([
-                'usuario_id' => $request->usuario,
+                'usuario_id' => $usuarioId,
                 'valor' => str_replace(",", ".", $request->valor),
-                'empresa_id' => $request->empresa_id,
+                'empresa_id' => $empresaId,
                 'primeira_venda_nfe' => $ultimaVendaNfe != null ? 
                 $ultimaVendaNfe->id : 0,
                 'primeira_venda_nfce' => $ultimaVendaNfce != null ? 
