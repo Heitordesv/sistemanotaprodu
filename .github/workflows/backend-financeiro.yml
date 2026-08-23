@@ -83,6 +83,7 @@ jobs:
           vendor/bin/phpunit tests/Feature/ContaReceberPagamentoIdempotenciaTest.php
           vendor/bin/phpunit tests/Feature/SegurancaOperacionalTest.php
           vendor/bin/phpunit tests/Feature/VendaErroSeguroTest.php
+          vendor/bin/phpunit tests/Feature/MercadoPagoConciliacaoDeterministicaTest.php
 
       - name: MySQL InnoDB concurrency and migration tests
         run: |
