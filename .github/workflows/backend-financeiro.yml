@@ -66,6 +66,7 @@ jobs:
         run: >-
           vendor/bin/phpunit
           tests/Feature/CaixaRecebimentosTest.php
+          tests/Feature/CaixaMovimentacaoRoutesTest.php
           tests/Feature/ContaReceberPagamentoConcorrenciaTest.php
           tests/Feature/ContaReceberPagamentoIdempotenciaTest.php
 
@@ -73,4 +74,5 @@ jobs:
         run: >-
           vendor/bin/phpunit
           tests/Integration/ContaReceberMysqlConcurrencyTest.php
+          tests/Integration/CaixaMovimentacaoMysqlConcurrencyTest.php
           tests/Integration/FinanceiroMigrationMysqlTest.php
