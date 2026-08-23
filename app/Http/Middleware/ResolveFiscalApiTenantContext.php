@@ -6,7 +6,12 @@ use App\Http\Controllers\API\NFCeController;
 use App\Http\Controllers\API\NFeController;
 use App\Http\Controllers\API\ProdutoController as ApiProdutoController;
 use App\Http\Controllers\AppFiscal\ConfigEmitenteController as AppConfigEmitenteController;
+use App\Http\Controllers\AppFiscal\NaturezaController as AppNaturezaController;
+use App\Http\Controllers\AppFiscal\NfceAppController;
+use App\Http\Controllers\AppFiscal\NotaFiscalAppController;
 use App\Http\Controllers\AppFiscal\ProdutoController as AppProdutoController;
+use App\Http\Controllers\AppFiscal\VendaCaixaController as AppVendaCaixaController;
+use App\Http\Controllers\AppFiscal\VendaController as AppVendaController;
 use App\Services\FiscalTenantGuardService;
 use Closure;
 use Illuminate\Http\Request;
@@ -31,6 +36,11 @@ class ResolveFiscalApiTenantContext
     private const APP_CONTROLLERS = [
         AppProdutoController::class,
         AppConfigEmitenteController::class,
+        AppNaturezaController::class,
+        AppVendaController::class,
+        AppVendaCaixaController::class,
+        NotaFiscalAppController::class,
+        NfceAppController::class,
     ];
 
     public function __construct(private FiscalTenantGuardService $guard)
@@ -57,23 +67,129 @@ class ResolveFiscalApiTenantContext
 
         if (in_array($controller, self::APP_CONTROLLERS, true)) {
             $empresaId = $this->guard->empresaIdPorTokenApp($request);
+            $this->validarAppFiscal($request, $controller, $method, $empresaId);
 
-            if ($controller === AppProdutoController::class) {
-                $produtoId = $this->resourceId($request, true);
-
-                if ($produtoId !== null) {
-                    $this->guard->produto($empresaId, $produtoId);
-                }
-            }
+            return $next($request);
         }
 
         return $next($request);
     }
 
+    private function validarAppFiscal(Request $request, string $controller, string $method, int $empresaId): void
+    {
+        if ($controller === AppProdutoController::class) {
+            $produtoId = $this->resourceId($request, ['id', 'product_id', 'produto_id']);
+
+            if ($produtoId !== null) {
+                $this->guard->produto($empresaId, $produtoId);
+            }
+
+            return;
+        }
+
+        if ($controller === AppConfigEmitenteController::class) {
+            if ($method === 'salvar') {
+                $this->validarNaturezaInput($request, $empresaId, 'nat_op_padrao');
+            }
+
+            return;
+        }
+
+        if ($controller === AppNaturezaController::class) {
+            $naturezaId = $this->resourceId($request, ['id', 'natureza_id']);
+
+            if ($naturezaId !== null) {
+                $this->guard->natureza($empresaId, $naturezaId);
+            }
+
+            return;
+        }
+
+        if ($controller === AppVendaController::class) {
+            $this->validarVendaApp($request, $method, $empresaId);
+            return;
+        }
+
+        if ($controller === AppVendaCaixaController::class) {
+            $this->validarVendaCaixaApp($request, $method, $empresaId);
+            return;
+        }
+
+        if ($controller === NotaFiscalAppController::class) {
+            $vendaId = $this->resourceId($request, ['venda_id', 'id']);
+
+            if ($vendaId !== null) {
+                $this->guard->venda($empresaId, $vendaId);
+            }
+
+            return;
+        }
+
+        if ($controller === NfceAppController::class) {
+            $vendaCaixaId = $this->resourceId($request, ['venda_id', 'id']);
+
+            if ($vendaCaixaId !== null) {
+                $this->guard->vendaCaixa($empresaId, $vendaCaixaId);
+            }
+        }
+    }
+
+    private function validarVendaApp(Request $request, string $method, int $empresaId): void
+    {
+        if (in_array($method, ['salvar', 'salvarOrcamento'], true)) {
+            $this->validarNaturezaInput($request, $empresaId, 'natureza');
+            $this->guard->produtos($empresaId, $this->produtoIdsDosItens($request));
+            return;
+        }
+
+        $vendaId = $this->resourceId($request, ['id', 'venda_id']);
+
+        if ($vendaId !== null) {
+            $this->guard->venda($empresaId, $vendaId);
+        }
+    }
+
+    private function validarVendaCaixaApp(Request $request, string $method, int $empresaId): void
+    {
+        if ($method === 'salvar') {
+            $this->guard->produtos($empresaId, $this->produtoIdsDosItens($request));
+            $this->guard->naturezaPadraoDaConfig($empresaId);
+            return;
+        }
+
+        $vendaCaixaId = $this->resourceId($request, ['id', 'venda_id']);
+
+        if ($vendaCaixaId !== null) {
+            $this->guard->vendaCaixa($empresaId, $vendaCaixaId);
+        }
+    }
+
+    private function validarNaturezaInput(Request $request, int $empresaId, string $campo): void
+    {
+        $naturezaId = $request->input($campo);
+
+        if ($this->positiveInteger($naturezaId)) {
+            $this->guard->natureza($empresaId, (int) $naturezaId);
+        }
+    }
+
+    private function produtoIdsDosItens(Request $request): array
+    {
+        return collect((array) $request->input('itens', []))
+            ->map(fn ($item) => is_array($item) ? ($item['item_id'] ?? null) : null)
+            ->filter(fn ($id) => $this->positiveInteger($id))
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
     private function validarRecursoFiscal(Request $request, string $controller, int $empresaId): void
     {
         $isProduto = $controller === ApiProdutoController::class;
-        $resourceId = $this->resourceId($request, $isProduto);
+        $resourceId = $this->resourceId(
+            $request,
+            $isProduto ? ['id', 'product_id', 'produto_id'] : ['id']
+        );
 
         if ($resourceId === null) {
             return;
@@ -99,12 +215,8 @@ class ResolveFiscalApiTenantContext
         return explode('@', $actionName, 2);
     }
 
-    private function resourceId(Request $request, bool $includeProductInputs = false): ?int
+    private function resourceId(Request $request, array $candidateKeys = ['id']): ?int
     {
-        $candidateKeys = $includeProductInputs
-            ? ['id', 'product_id', 'produto_id']
-            : ['id'];
-
         foreach ($candidateKeys as $key) {
             $value = $request->input($key);
             if ($this->positiveInteger($value)) {
