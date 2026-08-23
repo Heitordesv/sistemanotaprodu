@@ -211,7 +211,7 @@ public function gerarNFCe($venda){
 		$somaMunicipal = 0;
 		$somaTotTrib = 0;
 
-		$obsIbpt = "";
+		$fontesIbpt = [];
 
 		foreach($venda->itens as $i){
 			$itemCont++;
@@ -327,8 +327,10 @@ public function gerarNFCe($venda){
 				$vTotTribItem = $federal + $estadual + $municipal;
 				$somaTotTrib += $vTotTribItem;
 
-				$obsIbpt = " FONTE: " . ($ibpt->fonte ?? $ibpt->versao ?? '');
-				$obsIbpt .= " | ";
+				$fonteIbpt = trim((string) ($ibpt->fonte ?? $ibpt->versao ?? ''));
+				if($fonteIbpt !== ''){
+					$fontesIbpt[] = $fonteIbpt;
+				}
 			}
 
 			$imposto = $nfe->tagimposto($stdImposto, $this->format($vTotTribItem));
@@ -527,29 +529,20 @@ public function gerarNFCe($venda){
 			}
 		}
 
-		// INFORMAÇÃO ADICIONAL COM OS IMPOSTOS EXIBIDOS EXPLÍCITOS PARA O CLIENTE
+		// INFORMAÇÃO ADICIONAL EXIBIDA NO BLOCO DE TRIBUTOS DO DANFC-e.
 		$stdInfoAdic = new \stdClass();
-		$obs = "Valores aproximados de impostos pagos: ";
-		
-		$impostosDet = [];
-		if($somaFederal > 0) $impostosDet[] = "Federal: R$ " . number_format($somaFederal, 2, ',', '.');
-		if($somaEstadual > 0) $impostosDet[] = "Estadual: R$ " . number_format($somaEstadual, 2, ',', '.');
-		if($somaMunicipal > 0) $impostosDet[] = "Municipal: R$ " . number_format($somaMunicipal, 2, ',', '.');
-		if($somaICMS > 0) $impostosDet[] = "ICMS: R$ " . number_format($somaICMS, 2, ',', '.');
-		if($somaPIS > 0) $impostosDet[] = "PIS: R$ " . number_format($somaPIS, 2, ',', '.');
-		if($somaCOFINS > 0) $impostosDet[] = "COFINS: R$ " . number_format($somaCOFINS, 2, ',', '.');
-		if($somaIBS > 0) $impostosDet[] = "IBS: R$ " . number_format($somaIBS, 2, ',', '.');
-		if($somaCBS > 0) $impostosDet[] = "CBS: R$ " . number_format($somaCBS, 2, ',', '.');
-
-		if(count($impostosDet) > 0){
-			$obs .= implode(" | ", $impostosDet);
-		} else {
-			$obs .= "Nenhum imposto discriminado para esta venda.";
-		}
-		
-		$obs .= $obsIbpt;
-
-		$stdInfoAdic->infCpl = $obs;
+		$stdInfoAdic->infCpl = (new NFCeTaxReceiptTextService())->formatar([
+			'federal' => $somaFederal,
+			'estadual' => $somaEstadual,
+			'municipal' => $somaMunicipal,
+			'total' => $somaTotTrib,
+			'icms' => $somaICMS,
+			'pis' => $somaPIS,
+			'cofins' => $somaCOFINS,
+			'ibs' => $somaIBS,
+			'cbs' => $somaCBS,
+			'is' => $somaIS,
+		], $fontesIbpt);
 		$infoAdic = $nfe->taginfAdic($stdInfoAdic);
 
 		try{
