@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\ContaReceberMercadoPagoController;
 use App\Models\ContaReceber;
+use App\Services\ContaReceberMercadoPagoDirectChargeService;
 use App\Services\ContaReceberMercadoPagoService;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
@@ -83,7 +84,7 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
                 ];
             });
 
-        $controller = new ContaReceberMercadoPagoController($service);
+        $controller = $this->controller($service);
         $response = $controller->status(10);
         $payload = json_decode((string) $response->getContent(), true);
 
@@ -102,7 +103,7 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
             ->method('consultar')
             ->willThrowException(new \RuntimeException('Access token secreto e SQLSTATE interno'));
 
-        $controller = new ContaReceberMercadoPagoController($service);
+        $controller = $this->controller($service);
         $response = $controller->status(10);
         $conteudo = (string) $response->getContent();
         $payload = json_decode($conteudo, true);
@@ -166,5 +167,12 @@ class MercadoPagoConciliacaoDeterministicaTest extends TestCase
             $dataOriginal->format('Y-m-d H:i:s'),
             Carbon::parse((string) $conta->data_recebimento)->format('Y-m-d H:i:s')
         );
+    }
+
+    private function controller(ContaReceberMercadoPagoService $service): ContaReceberMercadoPagoController
+    {
+        $directChargeService = $this->createMock(ContaReceberMercadoPagoDirectChargeService::class);
+
+        return new ContaReceberMercadoPagoController($service, $directChargeService);
     }
 }
