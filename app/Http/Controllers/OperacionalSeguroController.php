@@ -12,7 +12,7 @@ class OperacionalSeguroController extends Controller
 {
     public function limparCache(Request $request)
     {
-        $this->autorizarAdministrador($request);
+        $this->autorizarSuperUsuario($request);
 
         Artisan::call('optimize:clear');
 
@@ -24,7 +24,7 @@ class OperacionalSeguroController extends Controller
 
     public function enviarCobranca(Request $request)
     {
-        $contexto = $this->autorizarAdministrador($request);
+        $contexto = $this->autorizarSuperUsuario($request);
 
         try {
             Artisan::call('notificacao:empresa-vencimento');
@@ -47,7 +47,7 @@ class OperacionalSeguroController extends Controller
         }
     }
 
-    private function autorizarAdministrador(Request $request): array
+    private function autorizarSuperUsuario(Request $request): array
     {
         $user = session('user_logged');
 
@@ -61,11 +61,13 @@ class OperacionalSeguroController extends Controller
         $usuarioId = (int) (is_object($user)
             ? ($user->id ?? 0)
             : ($user['id'] ?? $user['usuario_id'] ?? 0));
-        $admin = (bool) (is_object($user)
-            ? (($user->adm ?? false) || ($user->super ?? false))
-            : (($user['adm'] ?? false) || ($user['super'] ?? false)));
+        $super = (bool) (is_object($user)
+            ? ($user->super ?? false)
+            : ($user['super'] ?? false));
 
-        if ($empresaId <= 0 || $usuarioId <= 0 || !$admin) {
+        // Essas operações afetam a aplicação inteira. Administrador comum de
+        // empresa não pode limpar cache global nem disparar cobrança global.
+        if ($empresaId <= 0 || $usuarioId <= 0 || !$super) {
             abort(Response::HTTP_FORBIDDEN, 'Operação não autorizada.');
         }
 
