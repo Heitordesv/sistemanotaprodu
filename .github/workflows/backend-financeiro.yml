@@ -77,6 +77,9 @@ jobs:
           vendor/bin/phpunit tests/Feature/FiscalTenantGuardTest.php
           vendor/bin/phpunit tests/Feature/FiscalTenantGuardDatabaseTest.php
 
+      - name: PDV authentication security tests
+        run: vendor/bin/phpunit tests/Feature/PdvAuthSecurityTest.php
+
       - name: PDV delivery fee and adjustment tests
         run: vendor/bin/phpunit tests/Unit/PdvTotalServiceTest.php
 
