@@ -10,15 +10,21 @@ use RuntimeException;
 
 class ContaReceberPagamentoService
 {
+    private const FORMAS_NAO_RECEBIMENTO = ['06', '90'];
+
     public function registrarMultiplos(ContaReceber $conta, array $pagamentos, string $dataPagamento, ?string $loteUuid = null): ContaReceber
     {
         return DB::transaction(function () use ($conta, $pagamentos, $dataPagamento, $loteUuid) {
-            if ($loteUuid && ContaReceberPagamento::query()
-                ->where('conta_receber_id', $conta->id)
-                ->where('empresa_id', $conta->empresa_id)
-                ->where('lote_uuid', $loteUuid)
-                ->exists()) {
-                return ContaReceber::whereKey($conta->id)->firstOrFail();
+            // Fast-path para retry de uma operação já confirmada, inclusive se o
+            // caixa já tiver sido fechado depois do primeiro processamento.
+            if ($loteUuid && $this->loteIndividualRegistrado(
+                (int) $conta->id,
+                (int) $conta->empresa_id,
+                $loteUuid
+            )) {
+                return $this->marcarComoIdempotente(
+                    ContaReceber::query()->whereKey($conta->id)->firstOrFail()
+                );
             }
 
             // A abertura é sempre o primeiro recurso bloqueado. O fechamento do
@@ -28,11 +34,25 @@ class ContaReceberPagamentoService
                 $conta->filial_id ? (int) $conta->filial_id : null
             );
 
+            // Depois da abertura, bloqueamos a conta. Isso também serializa duas
+            // tentativas sobre a mesma conta vindas de caixas/operadores distintos.
             $conta = ContaReceber::query()
                 ->whereKey($conta->id)
                 ->where('empresa_id', $contexto['empresa_id'])
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            // Revalidação obrigatória DEPOIS dos locks. lockForUpdate() faz uma
+            // leitura corrente no InnoDB, enxergando um lote que tenha sido
+            // confirmado enquanto esta transação aguardava os locks.
+            if ($loteUuid && $this->loteIndividualRegistrado(
+                (int) $conta->id,
+                (int) $conta->empresa_id,
+                $loteUuid,
+                true
+            )) {
+                return $this->marcarComoIdempotente($conta);
+            }
 
             $this->validarFilialDaConta($conta, $contexto['abertura']);
 
@@ -51,6 +71,8 @@ class ContaReceberPagamentoService
                 if ($forma === '' || $valor <= 0) {
                     continue;
                 }
+
+                $this->validarFormaRecebimento($forma);
 
                 $normalizados[] = [
                     'forma_pagamento' => $forma,
@@ -145,15 +167,10 @@ class ContaReceberPagamentoService
         }
 
         $formaPagamento = trim($formaPagamento);
-        if ($formaPagamento === '') {
-            throw new RuntimeException('Informe a forma de pagamento do recebimento.');
-        }
+        $this->validarFormaRecebimento($formaPagamento);
 
         return DB::transaction(function () use ($ids, $empresaId, $formaPagamento, $dataPagamento, $loteUuid) {
-            if ($loteUuid && ContaReceberPagamento::query()
-                ->where('empresa_id', $empresaId)
-                ->where('lote_uuid', $loteUuid)
-                ->exists()) {
+            if ($loteUuid && $this->loteMassaRegistrado($empresaId, $loteUuid)) {
                 return ['quantidade' => 0, 'total' => 0.0, 'idempotente' => true];
             }
 
@@ -170,6 +187,13 @@ class ContaReceberPagamentoService
 
             if ($contas->count() !== $ids->count()) {
                 throw new RuntimeException('Uma ou mais contas selecionadas não pertencem à empresa atual ou não existem.');
+            }
+
+            // Segunda leitura idempotente somente depois de todos os locks que
+            // serializam a operação. Impede duas requisições simultâneas com o
+            // mesmo lote de gravarem o mesmo recebimento duas vezes.
+            if ($loteUuid && $this->loteMassaRegistrado($empresaId, $loteUuid, true)) {
+                return ['quantidade' => 0, 'total' => 0.0, 'idempotente' => true];
             }
 
             $quantidade = 0;
@@ -284,6 +308,58 @@ class ContaReceberPagamentoService
         if ($conta->filial_id && (int) $conta->filial_id !== (int) $abertura->filial_id) {
             throw new RuntimeException('A conta pertence a uma filial diferente do caixa atualmente aberto.');
         }
+    }
+
+    private function validarFormaRecebimento(string $formaPagamento): void
+    {
+        $formaPagamento = trim($formaPagamento);
+        $formas = ContaReceber::tiposPagamento();
+
+        if (
+            $formaPagamento === ''
+            || !array_key_exists($formaPagamento, $formas)
+            || in_array($formaPagamento, self::FORMAS_NAO_RECEBIMENTO, true)
+        ) {
+            throw new RuntimeException('Forma de pagamento inválida para recebimento.');
+        }
+    }
+
+    private function loteIndividualRegistrado(
+        int $contaId,
+        int $empresaId,
+        string $loteUuid,
+        bool $lockForUpdate = false
+    ): bool {
+        $query = ContaReceberPagamento::query()
+            ->where('conta_receber_id', $contaId)
+            ->where('empresa_id', $empresaId)
+            ->where('lote_uuid', $loteUuid);
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first(['id']) !== null;
+    }
+
+    private function loteMassaRegistrado(int $empresaId, string $loteUuid, bool $lockForUpdate = false): bool
+    {
+        $query = ContaReceberPagamento::query()
+            ->where('empresa_id', $empresaId)
+            ->where('lote_uuid', $loteUuid);
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first(['id']) !== null;
+    }
+
+    private function marcarComoIdempotente(ContaReceber $conta): ContaReceber
+    {
+        $conta->setAttribute('recebimento_idempotente', true);
+
+        return $conta;
     }
 
     private function registrarHistoricoCaixa(
