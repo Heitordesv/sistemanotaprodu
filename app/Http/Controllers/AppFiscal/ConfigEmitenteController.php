@@ -38,7 +38,7 @@ class ConfigEmitenteController extends Controller
         $res = false;
         if ($config == null) {
             $data = [
-                'empresa_id' => $empresaId,
+                'empresa_id' => $request->empresa_id,
                 'razao_social' => $request->razao_social,
                 'nome_fantasia' => $request->nome_fantasia,
                 'cnpj' => $request->cnpj,
