@@ -6,38 +6,39 @@ use Illuminate\Http\Request;
 use App\Models\ConfigNota;
 use App\Models\Produto;
 use App\Models\Venda;
-use App\Models\Certificado;
 use App\Models\NaturezaOperacao;
-use NFePHP\Common\Certificate;
+use App\Services\FiscalCertificateService;
 
 class ConfigEmitenteController extends Controller
 {
-    public function index(Request $request){
-
-        $config = ConfigNota::
-        where('empresa_id', $request->empresa_id)
-        ->first();
-
-        $config->cnpj = str_replace(" ", "", $config->cnpj);
-
-        $data = [
-            'config' => $config,
-            'dados' => $this->dadosParaCadastro($request->empresa_id)
-        ];
-        return response()->json($data, 200);
+    public function __construct(private FiscalCertificateService $certificates)
+    {
     }
 
-    public function salvar(Request $request){
-        $config = ConfigNota::
-        where('empresa_id', $request->empresa_id)
-        ->first();
+    public function index(Request $request)
+    {
+        $config = ConfigNota::where('empresa_id', $request->empresa_id)->first();
+
+        if ($config) {
+            $config->cnpj = str_replace(' ', '', $config->cnpj);
+        }
+
+        return response()->json([
+            'config' => $config,
+            'certificado_configurado' => $this->certificates->forEmpresa((int) $request->empresa_id) !== null,
+            'dados' => $this->dadosParaCadastro((int) $request->empresa_id),
+        ], 200);
+    }
+
+    public function salvar(Request $request)
+    {
+        $empresaId = (int) $request->empresa_id;
+        $config = ConfigNota::where('empresa_id', $empresaId)->first();
 
         $res = false;
-        if($config == null){
-            //create
-
+        if ($config == null) {
             $data = [
-                'empresa_id' => $request->empresa_id,
+                'empresa_id' => $empresaId,
                 'razao_social' => $request->razao_social,
                 'nome_fantasia' => $request->nome_fantasia,
                 'cnpj' => $request->cnpj,
@@ -67,15 +68,12 @@ class ConfigEmitenteController extends Controller
                 'ultimo_numero_mdfe' => $request->ultimo_numero_mdfe,
                 'numero_serie_nfe' => $request->numero_serie_nfe,
                 'numero_serie_nfce' => $request->numero_serie_nfce,
-                'csc' => $request->csc,
+                'csc' => $request->filled('csc') ? $request->csc : '',
                 'csc_id' => $request->csc_id,
-                'certificado_a3' => false
+                'certificado_a3' => false,
             ];
             $res = ConfigNota::create($data);
-
-        }else{
-            //update
-
+        } else {
             $config->razao_social = $request->razao_social;
             $config->nome_fantasia = $request->nome_fantasia;
             $config->cnpj = $request->cnpj;
@@ -105,77 +103,79 @@ class ConfigEmitenteController extends Controller
             $config->ultimo_numero_mdfe = $request->ultimo_numero_mdfe;
             $config->numero_serie_nfe = $request->numero_serie_nfe;
             $config->numero_serie_nfce = $request->numero_serie_nfce;
-            $config->csc = $request->csc;
+            if ($request->filled('csc')) {
+                $config->csc = $request->csc;
+            }
             $config->csc_id = $request->csc_id;
             $res = $config->save();
-
         }
-        return response()->json($res, 200);
+
+        return response()->json([
+            'ok' => (bool) $res,
+            'certificado_configurado' => $this->certificates->forEmpresa($empresaId) !== null,
+        ], 200);
     }
 
-    public function dadosParaCadastro($empresa_id){
-        $data = [
+    public function dadosParaCadastro($empresa_id)
+    {
+        return [
             'listaCSTCSOSN' => $this->itetable(Produto::listaCSTCSOSN()),
             'listaCST_PIS_COFINS' => $this->itetable(Produto::listaCST_PIS_COFINS()),
             'listaCST_IPI' => $this->itetable(Produto::listaCST_IPI()),
             'ufs' => $this->itetable(ConfigNota::estados()),
             'tiposPagamento' => $this->itetable(Venda::tiposPagamento()),
             'tiposFrete' => $this->itetable(ConfigNota::tiposFrete()),
-            'naturezas' => NaturezaOperacao::where('empresa_id', $empresa_id)->get()
+            'naturezas' => NaturezaOperacao::where('empresa_id', $empresa_id)->get(),
         ];
-        return $data;
     }
 
-    private function itetable($array){
+    private function itetable($array)
+    {
         $temp = [];
-        foreach($array as $key => $a){
-            $t = [
+        foreach ($array as $key => $a) {
+            $temp[] = [
                 'cod' => $key,
-                'value' => $a
+                'value' => $a,
             ];
-            array_push($temp, $t);
         }
+
         return $temp;
     }
 
-    public function dadosCertificado(){
-        $certificado = Certificado::first();
-        if($certificado != null){
-            $dados = $this->getInfoCertificado($certificado);
-            return response()->json($dados, 200);
+    public function dadosCertificado(Request $request)
+    {
+        $dados = $this->certificates->publicInfoForEmpresa((int) $request->empresa_id);
 
-        }else{
-            return response()->json("nada", 403);
-        }
+        return $dados !== null
+            ? response()->json($dados, 200)
+            : response()->json(['configurado' => false], 404);
     }
 
-    private function getInfoCertificado($certificado){
-
-        $infoCertificado = Certificate::readPfx($certificado->arquivo, $certificado->senha);
-
-        $publicKey = $infoCertificado->publicKey;
-
-        $inicio =  $publicKey->validFrom->format('Y-m-d H:i:s');
-        $expiracao =  $publicKey->validTo->format('Y-m-d H:i:s');
-
-        return [
-            'serial' => $publicKey->serialNumber,
-            'inicio' => \Carbon\Carbon::parse($inicio)->format('d-m-Y H:i'),
-            'expiracao' => \Carbon\Carbon::parse($expiracao)->format('d-m-Y H:i'),
-            'id' => $publicKey->commonName
-        ];
-
-    }
-
-    public function salvarCertificado(Request $request){
-        $certificado = Certificado::truncate();
-        // return response()->json($request->file, 201);
-
-        $res = Certificado::create([
-            'senha' => $request->senha,
-            'arquivo' => $request->file
+    public function salvarCertificado(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|string',
+            'senha' => 'required|string|max:255',
         ]);
 
-        return response()->json($res, 201);
+        try {
+            $this->certificates->replaceForEmpresa(
+                (int) $request->empresa_id,
+                (string) $request->file,
+                (string) $request->senha
+            );
+
+            return response()->json([
+                'ok' => true,
+                'certificado' => $this->certificates->publicInfoForEmpresa((int) $request->empresa_id),
+            ], 201);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'Não foi possível salvar o certificado digital.',
+            ], 422);
+        }
     }
 }
