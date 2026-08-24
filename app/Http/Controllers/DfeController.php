@@ -14,6 +14,7 @@ use App\Models\DivisaoGrade;
 use App\Models\Fornecedor;
 use App\Models\ItemCompra;
 use App\Models\ItemDfe;
+use App\Models\Filial;
 use App\Models\ManifestaDfe;
 use App\Models\ManifestoDia;
 use App\Models\Devolucao;
@@ -26,15 +27,16 @@ use NFePHP\NFe\Common\Standardize;
 use App\Models\TelaPedido;
 use NFePHP\DA\NFe\Danfe;
 use App\Helpers\StockMove;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 
 class DfeController extends Controller
 {
 
 	public function __construct()
 	{
-		if (!is_dir(public_path('xml_dfe'))) {
-			mkdir(public_path('xml_dfe'), 0777, true);
-		}
+		File::ensureDirectoryExists(public_path('xml_dfe'), 0755, true);
 	}
 
 	public function index(Request $request)
@@ -55,49 +57,66 @@ class DfeController extends Controller
 		$start_date = $request->get('start_date');
 		$end_date = $request->get('end_date');
 		$tipo = $request->get('tipo');
-		$data = ManifestaDfe::where('empresa_id', $request->empresa_id)
+		$query = ManifestaDfe::where('empresa_id', $request->empresa_id)
 		->when(!empty($start_date), function ($query) use ($start_date) {
 			return $query->whereDate('data_emissao', '>=', $start_date);
 		})
 		->when(!empty($end_date), function ($query) use ($end_date) {
 			return $query->whereDate('data_emissao', '<=', $end_date);
 		})
-		->orderBy('data_emissao', 'desc')
-		->paginate(env("PAGINACAO"));
+		->when($tipo !== null && $tipo !== '', function ($query) use ($tipo) {
+			return $query->where('tipo', (int) $tipo);
+		});
 
-		return view('dfe.index', compact('data'));
+		$totalValor = (clone $query)->sum('valor');
+		$data = $query
+		->orderBy('data_emissao', 'desc')
+		->paginate((int) config('app.pagination', 15));
+
+		return view('dfe.index', compact('data', 'totalValor'));
 	}
 
 	public function novaConsulta(Request $request)
 	{
-		$d1 = date("Y-m-d");
-		$d2 = date('Y-m-d', strtotime('+1 day'));
-		$consultas = ManifestoDia::whereBetween('created_at', [
-			$d1,
-			$d2
-		])
-		->where('empresa_id', $request->empresa_id)
-		->get();
 		return view('dfe.nova_consulta');
 	}
 
 	public function getDocumentosNovos(Request $request)
 	{
 		try {
-			$local = $request->local;
+			$request->validate(['local' => 'nullable|integer|min:0']);
+			$empresaId = (int) $request->empresa_id;
+			$local = (int) $request->input('local', 0);
 			$config = ConfigNota::where('empresa_id', $request->empresa_id)
 			->first();
+			if (!$config || !$config->arquivo) {
+				return response()->json(['message' => 'Configure o emitente e o certificado antes de consultar a SEFAZ.'], 422);
+			}
 			$isFilial = null;
 			if ($local > 0) {
-				$config = Filial::findOrFail($local);
+				$config = Filial::where('empresa_id', $empresaId)->findOrFail($local);
+				if (!$config->arquivo) {
+					return response()->json(['message' => 'Configure o certificado da filial antes de consultar a SEFAZ.'], 422);
+				}
 				$isFilial = $local;
+			}
+
+			$ultimaConsulta = ManifestoDia::where('empresa_id', $empresaId)
+				->where('created_at', '>=', Carbon::now()->subHour())
+				->latest('created_at')
+				->first();
+			if ($ultimaConsulta) {
+				$disponivelEm = Carbon::parse($ultimaConsulta->created_at)->addHour()->format('H:i');
+				return response()->json([
+					'message' => "A SEFAZ permite nova consulta após uma hora. Tente novamente às {$disponivelEm}."
+				]);
 			}
 			$cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
 			$dfe_service = new DFeService([
 				"atualizacao" => date('Y-m-d h:i:s'),
 				"tpAmb" => 1,
 				"razaosocial" => $config->razao_social,
-				"siglaUF" => $config->UF,
+				"siglaUF" => $config->UF ?? optional($config->cidade)->uf,
 				"cnpj" => $cnpj,
 				"schemes" => "PL_009_V4",
 				"versao" => "4.00",
@@ -122,25 +141,30 @@ class DfeController extends Controller
 
 				$novos = [];
 				foreach ($docs as $d) {
-					if ($this->validaNaoInserido($d['chave'])) {
-						if ($d['valor'] > 0 && $d['nome']) {
-							$d['filial_id'] = $local > 0 ? $local : null;
-							ManifestaDfe::create($d);
-							array_push($novos, $d);
-						}
+					if ((float) ($d['valor'] ?? 0) <= 0 || empty($d['nome']) || empty($d['chave'])) {
+						continue;
+					}
+					$d['empresa_id'] = $empresaId;
+					$d['filial_id'] = $local > 0 ? $local : null;
+					$manifesto = ManifestaDfe::firstOrCreate([
+						'empresa_id' => $empresaId,
+						'chave' => $d['chave'],
+					], $d);
+					if ($manifesto->wasRecentlyCreated) {
+						$novos[] = $d;
 					}
 				}
 
 				ManifestoDia::create([
-					'empresa_id' => $request->empresa_id
+					'empresa_id' => $empresaId
 				]);
 				return response()->json($novos, 200);
 			} else {
-				return response()->json($docs, 401);
+				return response()->json(['message' => $docs['message'] ?? 'A SEFAZ não retornou documentos.'], 422);
 			}
-		} catch (\Exception $e) {
-			return response()->json($e->getMessage(), 403);
-			__saveLogError($e, request()->empresa_id);
+		} catch (\Throwable $e) {
+			report($e);
+			return response()->json(['message' => 'Não foi possível consultar a SEFAZ. Verifique o certificado e tente novamente.'], 500);
 		}
 	}
 
@@ -199,7 +223,7 @@ class DfeController extends Controller
 
 				$manifesto = ManifestaDfe::where('empresa_id', $request->empresa_id)
 				->where('chave', $request->chave)
-				->first();
+				->firstOrFail();
 				$manifesto->sequencia_evento = $manifestaAnterior != null ? ($manifestaAnterior->sequencia_evento + 1) : 1;
 				$manifesto->tipo = $evento;
 				$manifesto->save();
@@ -222,7 +246,7 @@ class DfeController extends Controller
 			return redirect()->route('dfe.index');
 		} catch (\Throwable $e) {
 			report($e);
-			session()->flash('flash_erro', $e->getMessage());
+			session()->flash('flash_erro', 'Não foi possível concluir a manifestação. Confira os dados e tente novamente.');
 
 			return redirect()->route('dfe.index');
 		}
@@ -250,7 +274,7 @@ class DfeController extends Controller
 		->get();
 		$config = ConfigNota::where('empresa_id', request()->empresa_id)
 		->first();
-		$dfe = ManifestaDfe::findOrFail($id);
+		$dfe = $this->manifestoDaEmpresa($id);
 		$chave = $dfe->chave;
 		$cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
 		$dfe_service = new DFeService([
@@ -288,18 +312,19 @@ class DfeController extends Controller
 				} else {
 					$xml = file_get_contents(public_path('xml_dfe/') . $chave . '.xml');
 				}
-				if (strlen($xml) < 1000) {
-					unlink(public_path('xml_dfe/') . $chave . '.xml');
+				if (!is_string($xml) || strlen($xml) < 1000) {
+					File::delete(public_path('xml_dfe/') . $chave . '.xml');
+					throw new \RuntimeException('A SEFAZ não retornou o XML completo. Aguarde e tente novamente.');
 				}
 				$nfe = simplexml_load_string($xml);
+				if (!$nfe || !isset($nfe->NFe->infNFe)) {
+					throw new \RuntimeException('O XML retornado pela SEFAZ não é uma NF-e válida.');
+				}
 				$nNF = $nfe->NFe->infNFe->ide->nNF;
 				$dfe->nNF = $nNF;
 				// dd($dfe);
 				$dfe->save();
-				if (!$nfe) {
-					session()->flash('flash_erro', 'Erro ao ler XML');
-					return redirect('/dfe');
-				} else {
+				if ($nfe) {
 					if (!isset($nfe->NFe->infNFe->emit->xNome)) {
 						session()->flash('flash_erro', 'Isso não é uma NFe');
 						return redirect('/dfe');
@@ -311,8 +336,12 @@ class DfeController extends Controller
 					// dd($infos);
 					$fatura = $this->getFaturaDaNFe($nfe);
 					// dd($fatura);
-					$forn = Fornecedor::where('cpf_cnpj', $this->formataCnpj($fornecedor['cnpj']))
+					$forn = Fornecedor::where('empresa_id', request()->empresa_id)
+					->where('cpf_cnpj', $this->formataCnpj($fornecedor['cnpj']))
 					->first();
+					if (!$forn) {
+						throw new \RuntimeException('Não foi possível vincular o fornecedor desta NF-e.');
+					}
 					//caregar view
 
 					$categorias = Categoria::where('empresa_id', request()->empresa_id)
@@ -367,11 +396,12 @@ class DfeController extends Controller
 					));
 				}
 			}
-		} catch (\Exception $e) {
-			echo $e->getMessage() . '<br>' . $e->getLine();
-			die;
-			echo "Erro de soap:<br>";
-			echo $e->getMessage();
+		} catch (\Throwable $e) {
+			report($e);
+			session()->flash('flash_erro', $e instanceof \RuntimeException
+				? $e->getMessage()
+				: 'Não foi possível abrir o documento da SEFAZ. Tente novamente.');
+			return redirect()->route('dfe.index');
 		}
 	}
 
@@ -403,7 +433,9 @@ class DfeController extends Controller
 
 	private function verificaFornecedor($cnpj)
 	{
-		$forn = Fornecedor::verificaCadastrado($this->formataCnpj($cnpj));
+		$forn = Fornecedor::where('empresa_id', request()->empresa_id)
+		->where('cpf_cnpj', $this->formataCnpj($cnpj))
+		->first();
 		return $forn;
 	}
 
@@ -547,39 +579,61 @@ class DfeController extends Controller
 
 public function storeFatura(Request $request)
 {
-    $dfe = ManifestaDfe::findOrFail($request->dfe_id);
-
-    $categorias = CategoriaConta::where('empresa_id', $request->empresa_id)
-        ->where('tipo', 'pagar')
-        ->first();
+    $request->validate([
+        'dfe_id' => 'required|integer',
+        'fornecedor_id' => 'required|integer',
+        'vencimento' => 'required|array|min:1',
+        'vencimento.*' => 'required|date_format:d/m/Y',
+        'valor_parcela' => 'required|array|size:' . count((array) $request->vencimento),
+        'valor_parcela.*' => 'required',
+    ]);
 
     try {
-        for ($i = 0; $i < count($request->vencimento); $i++) {
+        DB::transaction(function () use ($request) {
+            $empresaId = (int) $request->empresa_id;
+            $dfe = ManifestaDfe::where('empresa_id', $empresaId)
+                ->lockForUpdate()
+                ->findOrFail((int) $request->dfe_id);
+            if ($dfe->fatura_salva) {
+                throw new \RuntimeException('As parcelas deste documento já foram salvas.');
+            }
 
-            // Converte data para formato Y-m-d
-            $dataVencimento = \Carbon\Carbon::createFromFormat('d/m/Y', $request->vencimento[$i])->format('Y-m-d');
+            $fornecedor = Fornecedor::where('empresa_id', $empresaId)
+                ->findOrFail((int) $request->fornecedor_id);
+            $categoria = CategoriaConta::where('empresa_id', $empresaId)
+                ->where('tipo', 'pagar')
+                ->first();
+            if (!$categoria) {
+                throw new \RuntimeException('Cadastre uma categoria de contas a pagar antes de importar a fatura.');
+            }
 
-            ContaPagar::create([
-                'compra_id' => null,
-                'data_vencimento' => $dataVencimento,
-                'data_pagamento' => $dataVencimento,
-                'valor_integral' => floatval(str_replace(',', '.', $request->valor_parcela[$i])),
-                'valor_pago' => 0,
-                'referencia' => '',
-                'categoria_id' => $categorias->id,
-                'status' => '',
-                'empresa_id' => $request->empresa_id,
-                'fornecedor_id' => $request->fornecedor_id,
-                'tipo_pagamento' => ''
-            ]);
-        }
+            foreach ($request->vencimento as $i => $vencimento) {
+                $dataVencimento = Carbon::createFromFormat('d/m/Y', $vencimento)->format('Y-m-d');
+                ContaPagar::create([
+                    'compra_id' => null,
+                    'data_vencimento' => $dataVencimento,
+                    'data_pagamento' => $dataVencimento,
+                    'valor_integral' => __convert_value_bd($request->valor_parcela[$i]),
+                    'valor_pago' => 0,
+                    'referencia' => 'NF-e ' . ($dfe->nNF ?: $dfe->chave),
+                    'categoria_id' => $categoria->id,
+                    'status' => 0,
+                    'empresa_id' => $empresaId,
+                    'fornecedor_id' => $fornecedor->id,
+                    'tipo_pagamento' => null,
+                    'filial_id' => $dfe->filial_id,
+                ]);
+            }
 
-        $dfe->fatura_salva = 1;
-        $dfe->save();
-
+            $dfe->fatura_salva = 1;
+            $dfe->save();
+        });
         session()->flash('flash_sucesso', 'Fatura adicionada com sucesso!');
-    } catch (\Exception $e) {
-        session()->flash('flash_erro', 'Algo deu errado: ' . $e->getMessage());
+    } catch (\Throwable $e) {
+        report($e);
+        session()->flash('flash_erro', $e instanceof \RuntimeException
+            ? $e->getMessage()
+            : 'Não foi possível salvar a fatura. Nenhuma parcela foi gravada.');
     }
 
     return redirect()->back();
@@ -587,215 +641,174 @@ public function storeFatura(Request $request)
 
 public function storeCompra(Request $request)
 {
+    $request->validate([
+        'dfe_id' => 'required|integer',
+        'fornecedor_id' => 'required|integer',
+        'chave' => 'required|string|size:44',
+        'nNf' => 'required',
+        'valor_total' => 'required',
+        'produto_id' => 'required|array|min:1',
+        'produto_id.*' => 'required|integer',
+        'quantidade' => 'required|array|size:' . count((array) $request->produto_id),
+        'valor_unitario' => 'required|array|size:' . count((array) $request->produto_id),
+        'unidade_compra' => 'required|array|size:' . count((array) $request->produto_id),
+        'cfop' => 'required|array|size:' . count((array) $request->produto_id),
+    ]);
+
     try {
-        // Busca fornecedor e DFE
-        $fornecedor = Fornecedor::findOrFail($request->fornecedor_id);
-        $dfe = ManifestaDfe::findOrFail($request->dfe_id);
+        DB::transaction(function () use ($request) {
+            $empresaId = (int) $request->empresa_id;
+            $fornecedor = Fornecedor::where('empresa_id', $empresaId)
+                ->findOrFail((int) $request->fornecedor_id);
+            $dfe = ManifestaDfe::where('empresa_id', $empresaId)
+                ->where('chave', $request->chave)
+                ->lockForUpdate()
+                ->findOrFail((int) $request->dfe_id);
+            if ((int) $dfe->compra_id > 0) {
+                throw new \RuntimeException('Este documento já foi importado como compra.');
+            }
 
-        // Cria registro da compra
-        $result = Compra::create([
-            'fornecedor_id' => $fornecedor->id,
-            'usuario_id' => get_id_user(),
-            'numero_nfe' => $request->nNf,
-            'observacao' => '',
-            'total' => floatval(str_replace(',', '.', $request->valor_total)),
-            'desconto' => floatval(str_replace(',', '.', $request->vDesc ?? 0)),
-            'xml_path' => '',
-            'estado' => 'aprovado',
-            'numero_emissao' => 0,
-            'chave' => $request->chave,
-            'empresa_id' => $request->empresa_id
-        ]);
-
-        $stockMove = new StockMove();
-
-        // Loop pelos produtos
-        for ($i = 0; $i < count($request->produto_id); $i++) {
-            $produto = Produto::findOrFail((int)$request->produto_id[$i]);
-
-            // Converte valores para float
-            $quantidade = floatval(str_replace(',', '.', $request->quantidade[$i]));
-            $valor_unitario = floatval(str_replace(',', '.', $request->valor_unitario[$i]));
-            $conversao = floatval($produto->conversao_unitaria ?? 1); // Se nulo, assume 1
-
-            // Cria item de compra
-            ItemCompra::create([
-                'compra_id' => $result->id,
-                'produto_id' => (int) $request->produto_id[$i],
-                'quantidade' => $quantidade,
-                'valor_unitario' => $valor_unitario,
-                'unidade_compra' => $request->unidade_compra[$i],
-                'cfop_entrada' => $request->cfop[$i],
-                'codigo_siad' => ''
+            $compra = Compra::create([
+                'fornecedor_id' => $fornecedor->id,
+                'usuario_id' => get_id_user(),
+                'numero_nfe' => $request->nNf,
+                'observacao' => '',
+                'total' => __convert_value_bd($request->valor_total),
+                'desconto' => __convert_value_bd($request->input('vDesc', 0)),
+                'estado' => 'aprovado',
+                'numero_emissao' => 0,
+                'chave' => $dfe->chave,
+                'empresa_id' => $empresaId,
+                'filial_id' => $dfe->filial_id,
             ]);
 
-            // Atualiza estoque
-            $stockMove->pluStock(
-                (int) $request->produto_id[$i],
-                __convert_value_bd($quantidade * $conversao),
-                __convert_value_bd($valor_unitario)
-            );
-        }
+            $stockMove = new StockMove();
+            foreach ($request->produto_id as $i => $produtoId) {
+                $produto = Produto::where('empresa_id', $empresaId)->findOrFail((int) $produtoId);
+                $quantidade = __convert_value_bd($request->quantidade[$i]);
+                $valorUnitario = __convert_value_bd($request->valor_unitario[$i]);
+                $conversao = (float) ($produto->conversao_unitaria ?: 1);
 
-        // Atualiza referência no DFE
-        $dfe->compra_id = $result->id;
-        $dfe->save();
+                ItemCompra::create([
+                    'compra_id' => $compra->id,
+                    'produto_id' => $produto->id,
+                    'quantidade' => $quantidade,
+                    'valor_unitario' => $valorUnitario,
+                    'unidade_compra' => $request->unidade_compra[$i],
+                    'cfop_entrada' => $request->cfop[$i],
+                    'codigo_siad' => '',
+                ]);
+                $stockMove->pluStock(
+                    $produto->id,
+                    $quantidade * $conversao,
+                    $valorUnitario,
+                    $dfe->filial_id
+                );
+            }
 
-        session()->flash('flash_sucesso', 'Salvo em compras');
-    } catch (\Exception $e) {
-        // Mostra mensagem de erro detalhada
-        echo "Erro: " . $e->getMessage() . "<br>Linha: " . $e->getLine();
-        die;
-        session()->flash('flash_erro', 'Algo deu errado: ' . $e->getMessage());
+            $dfe->compra_id = $compra->id;
+            $dfe->save();
+        });
+        session()->flash('flash_sucesso', 'Documento importado em compras e estoque atualizado.');
+    } catch (\Throwable $e) {
+        report($e);
+        session()->flash('flash_erro', $e instanceof \RuntimeException
+            ? $e->getMessage()
+            : 'Não foi possível importar a compra. Nenhuma alteração foi gravada.');
     }
 
     return redirect()->back();
 }
 
 	public function devolucao($id){
-		$item = ManifestaDfe::findOrFail($id);
-
-		$config = ConfigNota::where('empresa_id', request()->empresa_id)
-		->first();
-
-		$cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
-
-		$dfe_service = new DFeService([
-			"atualizacao" => date('Y-m-d h:i:s'),
-			"tpAmb" => 1,
-			"razaosocial" => $config->razao_social,
-			"siglaUF" => $config->cidade->uf,
-			"cnpj" => $cnpj,
-			"schemes" => "PL_009_V4",
-			"versao" => "4.00",
-			"tokenIBPT" => "AAAAAAA",
-			"CSC" => $config->csc,
-			"CSCid" => $config->csc_id
-		], $config);
-
-		// $response = $dfe_service->download($chave);
-
-		$chave = $item->chave;
-		$file_exists = false;
-		if (file_exists(public_path('xml_dfe/') . $chave . '.xml')) {
-			$file_exists = true;
-		}
-		if(!$file_exists){
-			$response = $dfe_service->download($chave);
-			$stz = new Standardize($response);
-			$std = $stz->toStd();
-		}else{
-			$std = null;
-		}
-		// print_r($response);
 		try {
-			if(!$file_exists){
-				$zip = $std->loteDistDFeInt->docZip;
-				$xml = gzdecode(base64_decode($zip));
-
-				file_put_contents(public_path('xml_dfe/').$chave.'.xml', $xml);
-			}else{
-				$xml = file_get_contents(public_path('xml_dfe/').$chave.'.xml');
-			}
-
-			if ($std != null && $std->cStat != 138) {
-				echo "Documento não retornado. [$std->cStat] $std->xMotivo" . ", aguarde alguns instantes e atualize a pagina!";  
-				die;
-			}
-
+			$item = $this->manifestoDaEmpresa($id);
+			$xml = $this->xmlDoManifesto($item);
 			$view = $this->viewXml($xml);
-
 			$item->devolucao = 1;
 			$item->save();
 			return $view;
-
-		} catch (InvalidArgumentException $e) {
-			echo "Ocorreu um erro durante o processamento :" . $e->getMessage();
-		}  
-
-
+		} catch (\Throwable $e) {
+			report($e);
+			session()->flash('flash_erro', 'Não foi possível preparar a devolução deste documento.');
+			return redirect()->route('dfe.index');
+		}
 	}
 
 	public function danfe($id){
-		$item = ManifestaDfe::findOrFail($id);
-
-		$config = ConfigNota::where('empresa_id', request()->empresa_id)
-		->first();
-
-		$cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
-
-		$dfe_service = new DFeService([
-			"atualizacao" => date('Y-m-d h:i:s'),
-			"tpAmb" => 1,
-			"razaosocial" => $config->razao_social,
-			"siglaUF" => $config->cidade->uf,
-			"cnpj" => $cnpj,
-			"schemes" => "PL_009_V4",
-			"versao" => "4.00",
-			"tokenIBPT" => "AAAAAAA",
-			"CSC" => $config->csc,
-			"CSCid" => $config->csc_id
-		], $config);
-
-		// $response = $dfe_service->download($chave);
-
-		$chave = $item->chave;
-		$file_exists = false;
-		if (file_exists(public_path('xml_dfe/') . $chave . '.xml')) {
-			$file_exists = true;
-		}
-		if(!$file_exists){
-			$response = $dfe_service->download($chave);
-			$stz = new Standardize($response);
-			$std = $stz->toStd();
-		}else{
-			$std = null;
-		}
-		// print_r($response);
 		try {
-			if(!$file_exists){
-				$zip = $std->loteDistDFeInt->docZip;
-				$xml = gzdecode(base64_decode($zip));
-
-				file_put_contents(public_path('xml_dfe/').$chave.'.xml', $xml);
-			}else{
-				$xml = file_get_contents(public_path('xml_dfe/').$chave.'.xml');
-			}
-
-			if ($std != null && $std->cStat != 138) {
-				echo "Documento não retornado. [$std->cStat] $std->xMotivo" . ", aguarde alguns instantes e atualize a pagina!";  
-				die;
-			}    
-			$dfe = ManifestaDfe::where('chave', $chave)->first();
+			$dfe = $this->manifestoDaEmpresa($id);
+			$xml = $this->xmlDoManifesto($dfe);
 			$nfe = simplexml_load_string($xml);
+			if (!$nfe || !isset($nfe->NFe->infNFe)) {
+				throw new \RuntimeException('XML inválido.');
+			}
 			$nNF = $nfe->NFe->infNFe->ide->nNF;
 			$dfe->nNF = $nNF;
 			$dfe->save();
-
-			file_put_contents(public_path('xml_dfe/').$chave.'.xml',$xml);
-
 			$danfe = new Danfe($xml);
-			// $id = $danfe->monta();
 			$pdf = $danfe->render();
-			header('Content-Type: application/pdf');
-			// echo $pdf;
 			return response($pdf)
 			->header('Content-Type', 'application/pdf');
-		} catch (InvalidArgumentException $e) {
-			echo "Ocorreu um erro durante o processamento :" . $e->getMessage();
-		}  
+		} catch (\Throwable $e) {
+			report($e);
+			session()->flash('flash_erro', 'Não foi possível gerar o DANFE deste documento.');
+			return redirect()->route('dfe.index');
+		}
+	}
 
+	private function xmlDoManifesto(ManifestaDfe $item): string
+	{
+		$arquivo = public_path('xml_dfe/' . $item->chave . '.xml');
+		if (File::isFile($arquivo)) {
+			$xml = File::get($arquivo);
+			if (strlen($xml) >= 1000) {
+				return $xml;
+			}
+			File::delete($arquivo);
+		}
 
+		$config = ConfigNota::where('empresa_id', request()->empresa_id)->first();
+		if (!$config || !$config->arquivo) {
+			throw new \RuntimeException('Emitente ou certificado não configurado.');
+		}
+		$service = new DFeService([
+			'atualizacao' => date('Y-m-d H:i:s'),
+			'tpAmb' => 1,
+			'razaosocial' => $config->razao_social,
+			'siglaUF' => optional($config->cidade)->uf,
+			'cnpj' => preg_replace('/[^0-9]/', '', $config->cnpj),
+			'schemes' => 'PL_009_V4',
+			'versao' => '4.00',
+			'tokenIBPT' => 'AAAAAAA',
+			'CSC' => $config->csc,
+			'CSCid' => $config->csc_id,
+		], $config);
+		$std = (new Standardize($service->download($item->chave)))->toStd();
+		if (!isset($std->cStat) || (int) $std->cStat !== 138 || !isset($std->loteDistDFeInt->docZip)) {
+			throw new \RuntimeException($std->xMotivo ?? 'Documento não retornado pela SEFAZ.');
+		}
+		$xml = gzdecode(base64_decode((string) $std->loteDistDFeInt->docZip));
+		if (!is_string($xml) || strlen($xml) < 1000) {
+			throw new \RuntimeException('A SEFAZ não retornou o XML completo.');
+		}
+		File::put($arquivo, $xml);
+		return $xml;
 	}
 
 	public function downloadXml($chave){
 
-		$dfe = ManifestaDfe::where('empresa_id', request()->empresa_id)->where('chave', $chave)->first();
-		$chave = $dfe->chave; 
-		$public = env('SERVIDOR_WEB') ? 'public/' : '';
-		if(file_exists($public.'xml_dfe/'.$chave.'.xml'))
-			return response()->download($public.'xml_dfe/'.$chave.'.xml');
-		else echo "Erro ao baixar XML, arquivo não encontrado!";
+		$dfe = ManifestaDfe::where('empresa_id', request()->empresa_id)->where('chave', $chave)->firstOrFail();
+		$arquivo = public_path('xml_dfe/' . $dfe->chave . '.xml');
+		if (!File::isFile($arquivo)) {
+			abort(404, 'XML ainda não foi baixado. Abra o documento antes de tentar baixá-lo.');
+		}
+		return response()->download($arquivo, $dfe->chave . '.xml');
+	}
+
+	private function manifestoDaEmpresa($id): ManifestaDfe
+	{
+		return ManifestaDfe::where('empresa_id', request()->empresa_id)->findOrFail((int) $id);
 	}
 
 	public function viewXml($xml)
@@ -953,8 +966,10 @@ public function storeCompra(Request $request)
 		->get();
 
 		$nameArchive = $chave . ".xml";
-		$pathXml = $chave . ".xml";
-		file_put_contents($chave . ".xml", $xml);
+		$diretorioDevolucao = public_path('xml_devolucao_entrada');
+		File::ensureDirectoryExists($diretorioDevolucao, 0755, true);
+		$pathXml = $diretorioDevolucao . DIRECTORY_SEPARATOR . $nameArchive;
+		File::put($pathXml, $xml);
 
 		$tipoFrete = 0;
 		if ($transportadora != null) {
@@ -981,7 +996,9 @@ public function storeCompra(Request $request)
 
 	private function verificaTransportadora($cnpj)
 	{
-		$transp = Transportadora::verificaCadastrado($cnpj);
+		$transp = Transportadora::where('empresa_id', request()->empresa_id)
+		->where('cnpj_cpf', $cnpj)
+		->first();
 		return $transp;
 	}
 

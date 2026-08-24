@@ -3,9 +3,16 @@ $(function () {
 });
 
 function buscarDocumentos() {
-    let empresa_id = $('#empresa_id').val();
-    
-    $.post(path_url + 'api/dfe/novos-documentos', { empresa_id: empresa_id })
+    const endpoint = window.dfeEndpoints && window.dfeEndpoints.novosDocumentos;
+    if (!endpoint) {
+        swal("Erro", "A rota de consulta de documentos não foi configurada.", "error");
+        return;
+    }
+
+    $('#aguarde').removeClass('d-none');
+    $('#btn-enviar').addClass('disabled').attr('aria-disabled', 'true');
+
+    $.get(endpoint)
     .done((res) => {
         // Se retornar uma lista de notas (Array)
         if (Array.isArray(res) && res.length > 0) {
@@ -28,8 +35,14 @@ function buscarDocumentos() {
         }
     })
     .fail((err) => {
-        let msg = (err.responseJSON && err.responseJSON.message) ? err.responseJSON.message : "Erro na API";
+        let msg = (err.responseJSON && err.responseJSON.message)
+            ? err.responseJSON.message
+            : "Não foi possível consultar a SEFAZ.";
         swal("Erro", msg, "error");
+    })
+    .always(() => {
+        $('#aguarde').addClass('d-none');
+        $('#btn-enviar').removeClass('disabled').removeAttr('aria-disabled');
     });
 }
 

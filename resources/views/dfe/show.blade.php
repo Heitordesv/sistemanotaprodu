@@ -7,7 +7,7 @@
                 <input type="hidden" name="id" value="{{{ isset($cliente) ? $cliente->id : 0 }}}">
                 <div class="card-header">
                     <h3 class="card-title">Manifesto XML</h3>
-                    <a href="/dfe/downloadXml/{{$infos['chave']}}" type="submit" class="btn btn-info">
+                    <a href="{{ route('dfe.downloadXml', $infos['chave']) }}" class="btn btn-info">
                         <i class="bx bx-file"></i>
                         Baixar XML
                     </a>
@@ -213,7 +213,13 @@
 </div>
 
 @section('js')
-<script type="text/javascript" src="/js/manifestoDfe.js"></script>
+<script>
+window.dfeEndpoints = {
+    salvarProduto: @json(route('dfe.produtos.store')),
+    subcategorias: @json(route('dfe.subcategorias.index'))
+};
+</script>
+<script type="text/javascript" src="{{ asset('js/manifestoDfe.js') }}?v={{ filemtime(public_path('js/manifestoDfe.js')) }}"></script>
 <script src="/js/grade.js"></script>
 <script src="/js/product.js"></script>
 <script src="/assets/js/jquery.uploadPreview.min.js"></script>
