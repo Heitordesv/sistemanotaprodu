@@ -111,7 +111,19 @@ class ProdutoController extends Controller
 
 public function pesquisa(Request $request)
 {
-    $filial_id = $request->filial_id ?? null;
+    return $this->pesquisar($request, false);
+}
+
+public function pesquisaWeb(Request $request)
+{
+    return $this->pesquisar($request, true);
+}
+
+private function pesquisar(Request $request, bool $aceitarProdutoLegadoSemLocal)
+{
+    $filial_id = $aceitarProdutoLegadoSemLocal
+        ? $this->normalizarFilialConsulta($request->input('filial_id'))
+        : ($request->filial_id ?? null);
 
     $data = Produto::with(['estoque', 'categoria'])
         ->orderBy('nome', 'desc')
@@ -127,7 +139,7 @@ public function pesquisa(Request $request)
 
     foreach ($data as $p) {
 
-        $locais = json_decode($p->locais);
+        $locais = json_decode((string) $p->locais, true);
 
         $p->estoqueAtual = $p->estoquePorLocalPavaVenda($filial_id);
 
@@ -155,18 +167,43 @@ public function pesquisa(Request $request)
         $p->desconto_percentual = $desconto;
         $p->tem_desconto = $temDesconto;
 
-        if ($filial_id) {
-            foreach ($locais as $l) {
-                if ($l == $filial_id) {
+        if ($aceitarProdutoLegadoSemLocal && $this->produtoDisponivelNoLocal($locais, $filial_id)) {
+            $temp[] = $p;
+        } elseif (!$aceitarProdutoLegadoSemLocal && $filial_id) {
+            foreach ((array) $locais as $local) {
+                if ($local == $filial_id) {
                     $temp[] = $p;
                 }
             }
-        } else {
+        } elseif (!$aceitarProdutoLegadoSemLocal) {
             $temp[] = $p;
         }
     }
 
     return response()->json($temp, 200);
+}
+
+private function normalizarFilialConsulta($filialId)
+{
+    if ($filialId === null || $filialId === '' || $filialId === 'todos') {
+        return null;
+    }
+
+    $filialId = (int) $filialId;
+
+    return $filialId === -1 || $filialId > 0 ? $filialId : null;
+}
+
+private function produtoDisponivelNoLocal($locais, $filialId): bool
+{
+    // Produtos legados sem locais definidos continuam disponíveis. Quando um
+    // local foi selecionado, produtos explicitamente vinculados a outros
+    // locais permanecem ocultos.
+    if ($filialId === null || !is_array($locais) || count($locais) === 0) {
+        return true;
+    }
+
+    return in_array((string) $filialId, array_map('strval', $locais), true);
 }
    
     public function find(

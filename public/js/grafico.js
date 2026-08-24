@@ -60,7 +60,6 @@ Dashboard.url = function (path) {
 
 Dashboard.params = function () {
     return {
-        empresa_id: $('#empresa_id').val(),
         local_id: $('#locais').length ? ($('#locais').val() || 'todos') : 'todos',
         data_inicial: $('#data_inicial').val(),
         data_final: $('#data_final').val(),

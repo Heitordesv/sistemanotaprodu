@@ -1073,9 +1073,9 @@ Route::get('/vendas-geral-view', 'RelatorioController@relatorioVendasGeralView')
 
 
 Route::group(['prefix' => 'produtos'], function () {
-    // Consultas usadas pelas telas autenticadas. O middleware verificaEmpresa
-    // substitui o empresa_id pelo tenant selecionado na sessao.
-    Route::get('/consulta/pesquisa', 'API\\ProdutoController@pesquisa')->name('produtos.consulta.pesquisa');
+    // Consultas usadas pelas telas autenticadas. O contexto web substitui o
+    // empresa_id pelo tenant selecionado na sessão antes do controller.
+    Route::get('/consulta/pesquisa', 'API\\ProdutoController@pesquisaWeb')->name('produtos.consulta.pesquisa');
     Route::get('/consulta/find/{id}', 'API\\ProdutoController@find')->name('produtos.consulta.find');
     Route::get('/consulta/findByBarcode', 'API\\ProdutoController@findByBarcode')->name('produtos.consulta.findByBarcode');
     Route::get('/consulta/findByBarcodeReference', 'API\\ProdutoController@findByBarcodeReference')->name('produtos.consulta.findByBarcodeReference');
@@ -1379,7 +1379,7 @@ Route::resource('funcionarios', FuncionarioController::class);
 
     Route::group(['prefix' => 'ordemServico'], function () {
         // Produtos da OS resolvidos pela empresa autenticada na sessão web.
-        Route::get('/produtos/pesquisa', 'API\\ProdutoController@pesquisa')->name('ordemServico.produtos.pesquisa');
+        Route::get('/produtos/pesquisa', 'API\\ProdutoController@pesquisaWeb')->name('ordemServico.produtos.pesquisa');
         Route::get('/produtos/find/{id}', 'API\\ProdutoController@find')->name('ordemServico.produtos.find');
         Route::get('/produtos/findByBarcode', 'API\\ProdutoController@findByBarcode')->name('ordemServico.produtos.findByBarcode');
         // Route::get('/', 'OrderController@index');

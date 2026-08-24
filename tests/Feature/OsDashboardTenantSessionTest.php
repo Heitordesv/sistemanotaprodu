@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\API\GraficoController;
 use App\Http\Controllers\API\ProdutoController;
+use App\Http\Middleware\ResolveFiscalWebTenantContext;
+use App\Services\FiscalTenantGuardService;
 use Illuminate\Http\Request;
 use Tests\TestCase;
 
@@ -78,5 +80,86 @@ class OsDashboardTenantSessionTest extends TestCase
             $javascript = (string) file_get_contents(public_path('js/' . $arquivo));
             $this->assertStringNotContainsString('api/produtos/find', $javascript);
         }
+    }
+
+    public function test_busca_e_dashboard_substituem_empresa_do_navegador_pela_sessao(): void
+    {
+        foreach ([
+            ProdutoController::class . '@pesquisaWeb',
+            GraficoController::class . '@getDataCards',
+        ] as $action) {
+            $guard = new OsDashboardRecordingTenantGuard();
+            $request = Request::create('/consulta', 'GET', ['empresa_id' => 999]);
+            $request->setRouteResolver(fn () => new OsDashboardTenantTestRoute($action));
+
+            (new ResolveFiscalWebTenantContext($guard))->handle(
+                $request,
+                fn ($resolvedRequest) => response()->json(['ok' => true])
+            );
+
+            $this->assertSame(22, (int) $request->empresa_id);
+            $this->assertSame([['web_tenant', 22]], $guard->calls);
+        }
+    }
+
+    public function test_front_nao_envia_empresa_como_identidade_do_dashboard(): void
+    {
+        $grafico = (string) file_get_contents(public_path('js/grafico.js'));
+        $this->assertStringNotContainsString("empresa_id: $('#empresa_id').val()", $grafico);
+        $this->assertStringContainsString('ProdutoController@pesquisaWeb', (string) file_get_contents(base_path('routes/web.php')));
+    }
+
+    public function test_busca_mantem_produtos_legados_sem_local_definido(): void
+    {
+        $controller = new ProdutoController();
+        $method = new \ReflectionMethod($controller, 'produtoDisponivelNoLocal');
+
+        $this->assertTrue($method->invoke($controller, null, -1));
+        $this->assertTrue($method->invoke($controller, [], 8));
+        $this->assertTrue($method->invoke($controller, [-1], -1));
+        $this->assertTrue($method->invoke($controller, [8], 8));
+        $this->assertFalse($method->invoke($controller, [9], 8));
+    }
+
+    public function test_busca_normaliza_local_sem_perder_a_matriz(): void
+    {
+        $controller = new ProdutoController();
+        $method = new \ReflectionMethod($controller, 'normalizarFilialConsulta');
+
+        $this->assertNull($method->invoke($controller, null));
+        $this->assertNull($method->invoke($controller, 'todos'));
+        $this->assertSame(-1, $method->invoke($controller, '-1'));
+        $this->assertSame(8, $method->invoke($controller, '8'));
+    }
+}
+
+class OsDashboardTenantTestRoute
+{
+    public function __construct(private string $action)
+    {
+    }
+
+    public function getActionName(): string
+    {
+        return $this->action;
+    }
+
+    public function parameters(): array
+    {
+        return [];
+    }
+}
+
+class OsDashboardRecordingTenantGuard extends FiscalTenantGuardService
+{
+    public array $calls = [];
+
+    public function empresaIdDaSessao(Request $request): int
+    {
+        $request->merge(['empresa_id' => 22]);
+        $request->attributes->set(self::VERIFIED_TENANT_ATTRIBUTE, 22);
+        $this->calls[] = ['web_tenant', 22];
+
+        return 22;
     }
 }
