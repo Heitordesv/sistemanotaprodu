@@ -1113,7 +1113,7 @@ class NFService{
 			$arr = $stdCl->toArray();
 			return $arr;
 		} catch (\Exception $e) {
-			echo $e->getMessage();
+			throw $e;
 		}
 	}
 
@@ -1168,7 +1168,7 @@ class NFService{
 			return $arr;
 
 		} catch (\Exception $e) {
-			echo $e->getMessage();
+			throw $e;
 		}
 	}
 
