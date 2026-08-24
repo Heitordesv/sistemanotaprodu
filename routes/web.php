@@ -42,7 +42,6 @@ use App\Http\Controllers\DebitosController;
 use App\Http\Controllers\EstoqueController;
 
 use App\Http\Controllers\ConsultarController;
-use App\Http\Controllers\InterPixController;
 
 use App\Http\Controllers\ApuracaoMensalController;
 
@@ -561,7 +560,6 @@ Route::middleware([
 Route::get('/motoboy', 'TelaPedidoController@motoboyView')->name('tela_pedido.motoboy');
 
 Route::post('/cadastrarMotoboy', 'TelaPedidoController@motoboyStore')->name('tela_pedido.motoboy.store');
-Route::get('/interpix/token', [InterPixController::class, 'autenticar']);
 
 
     Route::get('/new', 'TelaPedidoController@new');
