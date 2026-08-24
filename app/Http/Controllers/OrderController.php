@@ -426,6 +426,8 @@ class OrderController extends Controller
 
     public function alterarEstadoPost(Request $request)
     {
+        $whatsAppFalhou = false;
+
         $dados = $request->validate([
             'id' => 'required|integer|exists:ordem_servicos,id',
             'novo_estado' => 'required|in:pendente,Em Andamento,pronto,finalizado,reprovado',
@@ -478,13 +480,35 @@ class OrderController extends Controller
 
                 $mensagem = $mensagens[$estado] ?? "Olá, {$nomeCliente}! Sua ordem de serviço foi atualizada para *{$ordem->estado}*.";
 
-                EnviarMensagemWhatsAppOS::dispatch($request->empresa_id, $numero, $mensagem);
+                try {
+                    EnviarMensagemWhatsAppOS::dispatch($request->empresa_id, $numero, $mensagem);
+                } catch (\Throwable $e) {
+                    $whatsAppFalhou = true;
+
+                    Log::warning('OS alterada, mas a notificação pela Evolution não foi enviada', [
+                        'empresa_id' => $request->empresa_id,
+                        'ordem_servico_id' => $ordem->id,
+                        'cliente_id' => $cliente->id,
+                        'erro' => $e->getMessage(),
+                    ]);
+                }
             }
 
-            session()->flash("flash_sucesso", "Ordem de serviço alterada com sucesso!");
-        } catch (\Exception $e) {
-            Log::error("Erro ao alterar estado da OS [{$request->id}]: " . $e->getMessage());
-            session()->flash("flash_erro", "Erro ao alterar a ordem: " . $e->getMessage());
+            if ($whatsAppFalhou) {
+                session()->flash(
+                    'flash_warning',
+                    'Ordem de serviço alterada, mas a mensagem não foi enviada. Reconecte o WhatsApp na configuração da Evolution API.'
+                );
+            } else {
+                session()->flash('flash_sucesso', 'Ordem de serviço alterada com sucesso!');
+            }
+        } catch (\Throwable $e) {
+            Log::error('Erro ao alterar estado da OS', [
+                'empresa_id' => $request->empresa_id,
+                'ordem_servico_id' => $request->id,
+                'erro' => $e->getMessage(),
+            ]);
+            session()->flash('flash_erro', 'Não foi possível alterar a ordem de serviço. Tente novamente.');
         }
 
         return redirect()->route('ordemServico.completa', $request->id);

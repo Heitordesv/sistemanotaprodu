@@ -79,12 +79,10 @@ class EvolutionApiService
         $number = $this->normalizeWhatsappNumber($number);
         $endpoint = $this->url('/message/sendText/' . rawurlencode($config->evolution_instance));
 
-        // Formato aceito por várias versões da Evolution API.
+        // Formato exigido pela Evolution usada em produção.
         $response = $this->client()->post($endpoint, [
             'number' => $number,
-            'textMessage' => [
-                'text' => $text,
-            ],
+            'text' => $text,
             'delay' => 1200,
             // A Evolution tenta baixar todo link quando a previsualizacao esta
             // ativa. Links autenticados/temporarios (como os usados nas OS)
@@ -99,12 +97,17 @@ class EvolutionApiService
         $firstStatus = $response->status();
         $firstBody = $response->body();
 
-        // Algumas versões 2.x usam `text` diretamente no corpo em vez de `textMessage`.
-        // Tenta automaticamente o segundo formato em erros de validação/implementação.
+        if (str_contains(strtolower($firstBody), 'connection closed')) {
+            throw new RuntimeException('A conexão do WhatsApp está fechada. Reconecte o aparelho na configuração da Evolution API.');
+        }
+
+        // Compatibilidade com instalações antigas que esperam textMessage.
         if (in_array($firstStatus, [400, 422, 500], true)) {
             $response = $this->client()->post($endpoint, [
                 'number' => $number,
-                'text' => $text,
+                'textMessage' => [
+                    'text' => $text,
+                ],
                 'delay' => 1200,
                 'linkPreview' => false,
             ]);
@@ -115,8 +118,8 @@ class EvolutionApiService
 
             throw new RuntimeException(
                 'Envio de mensagem pela Evolution falhou nos dois formatos. '
-                . 'Formato textMessage: HTTP ' . $firstStatus . ' - ' . $firstBody
-                . ' | Formato text: HTTP ' . $response->status() . ' - ' . $response->body()
+                . 'Formato text: HTTP ' . $firstStatus . ' - ' . $firstBody
+                . ' | Formato textMessage: HTTP ' . $response->status() . ' - ' . $response->body()
             );
         }
 

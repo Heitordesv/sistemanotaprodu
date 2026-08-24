@@ -41,7 +41,7 @@ class EvolutionApiServiceTest extends TestCase
             return $request->url() === 'https://evolution.test/message/sendText/empresa-10'
                 && $request['number'] === '5511999999999'
                 && $request['linkPreview'] === false
-                && data_get($request->data(), 'textMessage.text') === 'Acompanhe sua OS: https://sistema.test/ordem-servico/10';
+                && $request['text'] === 'Acompanhe sua OS: https://sistema.test/ordem-servico/10';
         });
     }
 
@@ -63,8 +63,32 @@ class EvolutionApiServiceTest extends TestCase
 
         Http::assertSentCount(2);
         Http::assertSent(function ($request) {
-            return array_key_exists('text', $request->data())
+            return data_get($request->data(), 'textMessage.text') === 'Mensagem da OS com https://sistema.test/arquivo-protegido'
                 && $request['linkPreview'] === false;
         });
+    }
+
+    public function test_conexao_fechada_retorna_orientacao_sem_tentar_outro_payload(): void
+    {
+        Http::fake([
+            'evolution.test/*' => Http::response([
+                'status' => 400,
+                'error' => 'Bad Request',
+                'response' => ['message' => ['Error: Connection Closed']],
+            ], 400),
+        ]);
+
+        $config = new EmpresaIntegracao([
+            'evolution_instance' => 'empresa-10',
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Reconecte o aparelho');
+
+        try {
+            (new EvolutionApiService())->sendText($config, '5511999999999', 'Mensagem da OS');
+        } finally {
+            Http::assertSentCount(1);
+        }
     }
 }
