@@ -5,6 +5,8 @@ namespace App\Http\Middleware;
 use App\Http\Controllers\ConfigNotaController;
 use App\Http\Controllers\NaturezaController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\API\GraficoController;
+use App\Http\Controllers\API\ProdutoController as ApiProdutoController;
 use App\Services\FiscalTenantGuardService;
 use Closure;
 use Illuminate\Http\Request;
@@ -15,6 +17,8 @@ class ResolveFiscalWebTenantContext
         ProductController::class,
         NaturezaController::class,
         ConfigNotaController::class,
+        ApiProdutoController::class,
+        GraficoController::class,
     ];
 
     private const CONFIG_ACTIONS_WITH_RESOURCE = [
