@@ -127,7 +127,7 @@
         <script src='https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.js'></script>
         <script type="text/javascript" src="/js/jquery.mask.min.js"></script>
         <script src="/assets/js/select2.min.js"></script>
-        <script src="/js/main.js"></script>
+        <script src="{{ asset('js/main.js') }}?v={{ filemtime(public_path('js/main.js')) }}"></script>
         <script src="{{ asset('js/pre_venda.js') }}?v={{ filemtime(public_path('js/pre_venda.js')) }}"></script>
         <script src="/js/theme.js"></script>
         <script src="/assets/js/toastr.min.js"></script>

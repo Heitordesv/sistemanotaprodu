@@ -75,11 +75,41 @@ class OsDashboardTenantSessionTest extends TestCase
         $this->assertStringNotContainsString("ajaxGet('api/graficos/", $grafico);
         $this->assertStringContainsString("ajaxGet('graficos/dados/", $grafico);
         $this->assertStringContainsString('window.pdvProdutoEndpoints = window.produtoWebEndpoints', $scripts);
+        $this->assertStringNotContainsString('api/produtos/pesquisa', (string) file_get_contents(public_path('js/main.js')));
 
         foreach (['vendas.js', 'compra.js', 'pre_venda.js', 'pedidos.js', 'nfeRemessa.js'] as $arquivo) {
             $javascript = (string) file_get_contents(public_path('js/' . $arquivo));
             $this->assertStringNotContainsString('api/produtos/find', $javascript);
         }
+    }
+
+    public function test_telas_compartilhadas_invalidam_cache_do_seletor_de_produtos(): void
+    {
+        $scripts = (string) file_get_contents(
+            resource_path('views/default/components/scripts.blade.php')
+        );
+        $preVenda = (string) file_get_contents(
+            resource_path('views/pre_venda/index.blade.php')
+        );
+        $pdv = (string) file_get_contents(
+            resource_path('views/frontBox/index.blade.php')
+        );
+
+        foreach ([$scripts, $preVenda, $pdv] as $view) {
+            $this->assertStringContainsString('js/main.js', $view);
+            $this->assertStringContainsString('filemtime(', $view);
+        }
+    }
+
+    public function test_busca_web_retorna_payload_enxuto_e_tolera_utf8_legado(): void
+    {
+        $controller = (string) file_get_contents(
+            app_path('Http/Controllers/API/ProdutoController.php')
+        );
+
+        $this->assertStringContainsString('produtoParaPesquisaWeb', $controller);
+        $this->assertStringContainsString('JSON_INVALID_UTF8_SUBSTITUTE', $controller);
+        $this->assertStringContainsString("'estoqueAtual' =>", $controller);
     }
 
     public function test_busca_e_dashboard_substituem_empresa_do_navegador_pela_sessao(): void

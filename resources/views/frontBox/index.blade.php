@@ -870,7 +870,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.js"></script>
     <script src="{{ asset('js/jquery.mask.min.js') }}"></script>
     <script src="{{ asset('assets/js/select2.min.js') }}"></script>
-    <script src="{{ asset('js/main.js') }}?v=10"></script>
+    <script src="{{ asset('js/main.js') }}?v={{ filemtime(public_path('js/main.js')) }}"></script>
     <script src="{{ asset('js/frontBox.js') }}?v=11"></script>
     <script src="{{ asset('js/theme.js') }}?v=1"></script>
     <script src="{{ asset('assets/js/toastr.min.js') }}"></script>
