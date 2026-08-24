@@ -1693,8 +1693,6 @@ Route::get('/api/graficos/contasPagar/categoria', [GraficoController::class, 'co
 
     Route::group(['prefix' => 'orcamentoVenda'], function () {
         Route::post('/gerarPagamentos', 'OrcamentoController@gerarPagamentos')->name('orcamentoVenda.gerarPagamentos');
-        Route::resource('orcamentoVenda', 'OrcamentoController')->except(['create']);
-
         Route::get('/destroyParcela/{id}', 'OrcamentoController@destroyParcela')->name('orcamentoVenda.destroyParcela');
         Route::get('/destroyItem/{id}', 'OrcamentoController@destroyItem')->name('orcamentoVenda.destroyItem');
         Route::post('/addPagamentos', 'OrcamentoController@addPagamentos')->name('orcamentoVenda.addPagamentos');
