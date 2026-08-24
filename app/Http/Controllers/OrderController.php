@@ -469,14 +469,14 @@ class OrderController extends Controller
                 $estado = strtolower($ordem->estado);
 
                 $mensagens = [
-                    'finalizado' => "Olá {$nomeCliente}, sua ordem foi *FINALIZADA*! 🎉 Agradecemos sua confiança. Avalie-nos: https://avaliar.exemplo.com",
-                    'em andamento' => "Olá {$nomeCliente}, sua OS está *em andamento*! Em breve traremos novidades.",
-                    'reprovado' => "Olá {$nomeCliente}, sua ordem foi *REPROVADA*. Em caso de dúvidas, fale conosco.",
-                    'pendente' => "Olá {$nomeCliente}, sua OS está *pendente*. Avisaremos sobre atualizações.",
-                    'pronto' => "Olá {$nomeCliente}, sua ordem está *PRONTA*! ✅ Pode vir buscar."
+                    'finalizado' => "Olá, {$nomeCliente}! Sua ordem de serviço foi *finalizada*. 🎉 Agradecemos pela confiança!",
+                    'em andamento' => "Olá, {$nomeCliente}! Sua ordem de serviço está *em andamento*. Em breve, enviaremos novas informações.",
+                    'reprovado' => "Olá, {$nomeCliente}! Sua ordem de serviço foi *reprovada*. Se tiver alguma dúvida, fale conosco.",
+                    'pendente' => "Olá, {$nomeCliente}! Sua ordem de serviço está *pendente*. Avisaremos quando houver uma atualização.",
+                    'pronto' => "Olá, {$nomeCliente}! Sua ordem de serviço está *pronta*. ✅ Você já pode retirá-la."
                 ];
 
-                $mensagem = $mensagens[$estado] ?? "Olá {$nomeCliente}, sua ordem foi atualizada para: *{$ordem->estado}*.";
+                $mensagem = $mensagens[$estado] ?? "Olá, {$nomeCliente}! Sua ordem de serviço foi atualizada para *{$ordem->estado}*.";
 
                 EnviarMensagemWhatsAppOS::dispatch($request->empresa_id, $numero, $mensagem);
             }

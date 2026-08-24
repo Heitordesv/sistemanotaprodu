@@ -86,7 +86,10 @@ class EvolutionApiService
                 'text' => $text,
             ],
             'delay' => 1200,
-            'linkPreview' => true,
+            // A Evolution tenta baixar todo link quando a previsualizacao esta
+            // ativa. Links autenticados/temporarios (como os usados nas OS)
+            // retornam 403 e algumas versoes abortam o envio da mensagem.
+            'linkPreview' => false,
         ]);
 
         if ($response->successful()) {
@@ -103,7 +106,7 @@ class EvolutionApiService
                 'number' => $number,
                 'text' => $text,
                 'delay' => 1200,
-                'linkPreview' => true,
+                'linkPreview' => false,
             ]);
 
             if ($response->successful()) {

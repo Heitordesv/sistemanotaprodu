@@ -151,9 +151,17 @@ class EvolutionMessageController extends Controller
                 (int) $ordem->id
             );
         } catch (\Throwable $e) {
+            Log::error('Falha ao enviar mensagem manual de OS pela Evolution', [
+                'empresa_id' => $empresaId,
+                'ordem_servico_id' => $ordem->id,
+                'cliente_id' => $cliente->id,
+                'numero' => $numero,
+                'erro' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'status' => 'erro',
-                'mensagem' => 'Não foi possível enviar a mensagem da OS: ' . $e->getMessage(),
+                'mensagem' => 'Não foi possível enviar a mensagem da OS. Verifique se o WhatsApp está conectado e tente novamente.',
             ], 422);
         }
 

@@ -128,7 +128,7 @@ class CobrancaMensagemHelper
                 ? self::templatesPadrao()[$tipo]
                 : "Olá, {cliente}! 👋\n\nSua *Ordem de Serviço #{os}* teve uma atualização.\n\nStatus atual: *{status}*.");
 
-        return strtr($template, [
+        $mensagem = strtr($template, [
             '{cliente}' => $nome,
             '{os}' => (string) $numero,
             '{os_id}' => (string) $ordem->id,
@@ -136,6 +136,25 @@ class CobrancaMensagemHelper
             '{descricao}' => (string) ($ordem->descricao ?: ''),
             '{valor}' => number_format((float) ($ordem->valor ?: 0), 2, ',', '.'),
         ]);
+
+        return self::removerLinksDaMensagemOs($mensagem);
+    }
+
+    /**
+     * Mensagens de OS nao devem enviar links. Alem de deixar a comunicacao mais
+     * objetiva, isso impede a Evolution de tentar baixar paginas protegidas.
+     */
+    private static function removerLinksDaMensagemOs(string $mensagem): string
+    {
+        $linhas = preg_split('/\R/u', $mensagem) ?: [];
+        $linhas = array_filter($linhas, static function (string $linha): bool {
+            return !preg_match('~(?:https?://|www\.|\{link\})~iu', $linha);
+        });
+
+        $mensagem = implode("\n", $linhas);
+        $mensagem = preg_replace("/\n{3,}/u", "\n\n", $mensagem) ?: $mensagem;
+
+        return trim($mensagem);
     }
 
     public static function mensagemCadastrada(int $empresaId, string $tipo): ?string
