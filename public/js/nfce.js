@@ -6,7 +6,7 @@ $('.btn-consulta-status').click(() => {
 	let token = $('#_token').val();
 	let empresa_id = $("#empresa_id").val();
 
-	$.post(path_url + 'api/nfce/consulta-status-sefaz',{ empresa_id: empresa_id })
+	$.post(path_url + 'fiscal/nfce/status-sefaz',{ empresa_id: empresa_id })
 	.done((res) => {
 		console.log(res)
 		let msg = "cStat: " + res.cStat
@@ -28,7 +28,7 @@ $('.btn-consulta-status').click(() => {
 function emitirNFCe(id){
 	console.clear()
 	let empresa_id = $("#empresa_id").val();
-	$.post(path_url + "api/nfce/transmitir", {
+	$.post(path_url + "fiscal/nfce/transmitir", {
 		id: id,
 		empresa_id: empresa_id,
 	})
@@ -66,7 +66,7 @@ function emitirNFCe(id){
 
 function consultarNFCe(id){
 	let empresa_id = $("#empresa_id").val();
-	$.post(path_url + "api/nfce/consultar", {
+	$.post(path_url + "fiscal/nfce/consultar", {
 		id: id,
 		empresa_id: empresa_id,
 	})
@@ -121,7 +121,7 @@ $('#btn-cancelar-send').click(() => {
     let botao = $('#btn-cancelar-send')
     botao.prop('disabled', true).text('Autorizando...')
 
-    $.post(path_url + "api/nfce/cancelar", {
+    $.post(path_url + "fiscal/nfce/cancelar", {
         id: id,
         empresa_id: empresa_id,
         motivo: motivo,
@@ -164,7 +164,7 @@ $('#btn-inutilizar-send').click(() => {
 	let numero_inicial = $('#inp-numero_nfce_inicial').val()
 	let numero_final = $('#inp-numero_nfce_final').val()
 	if(motivo.length >= 15){
-		$.post(path_url + "api/nfce/inutilizar", {
+		$.post(path_url + "fiscal/nfce/inutilizar", {
 			empresa_id: empresa_id,
 			motivo: motivo,
 			numero_inicial: numero_inicial,

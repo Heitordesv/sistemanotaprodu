@@ -68,7 +68,7 @@ function getCheckedElement(callback) {
 $('.btn-consulta-status').click(() => {
 	let empresa_id = $("#empresa_id").val()
 
-	$.post(path_url + 'api/nfe/consulta-status-sefaz', { empresa_id })
+	$.post(path_url + 'fiscal/nfe/status-sefaz', { empresa_id })
 	.done(res => {
 		let msg = `cStat: ${res.cStat}\nMotivo: ${res.xMotivo}\nAmbiente: ${res.tpAmb == 2 ? "Homologação" : "Produção"}\nverAplic: ${res.verAplic}`
 		swal("Sucesso", msg, "success")
@@ -85,7 +85,7 @@ $('#btn-enviar').click(() => {
 
 		let empresa_id = $("#empresa_id").val()
 
-		$.post(path_url + "api/nfe/transmitir", { id, empresa_id })
+		$.post(path_url + "fiscal/nfe/transmitir", { id, empresa_id })
 		.done(() => {
 			swal("Sucesso", "NFe emitida", "success").then(() => {
 				window.open(path_url + 'nfe/imprimir/' + id, "_blank")
@@ -116,7 +116,7 @@ $('#btn-consultar').click(() => {
 
 		let empresa_id = $("#empresa_id").val()
 
-		$.post(path_url + "api/nfe/consulta-nfe", { id, empresa_id })
+		$.post(path_url + "fiscal/nfe/consultar", { id, empresa_id })
 		.done(res => {
 			if (res.protNFe) {
 				let p = res.protNFe.infProt
@@ -149,7 +149,7 @@ $('#btn-cancelar-send').click(() => {
 		if (motivo.length < 15)
 			return swal("Alerta", "Informe no mínimo 15 caracteres", "warning")
 
-		$.post(path_url + "api/nfe/cancelar-nfe", { id, empresa_id, motivo })
+		$.post(path_url + "fiscal/nfe/cancelar", { id, empresa_id, motivo })
 		.done(res => {
 			let inf = res.retEvento.infEvento
 			swal("Sucesso", `[${inf.cStat}] ${inf.xMotivo}`, "success").then(() => {
@@ -182,7 +182,7 @@ $('#btn-corrige-send').click(() => {
 		if (motivo.length < 15)
 			return swal("Alerta", "Informe no mínimo 15 caracteres", "warning")
 
-		$.post(path_url + "api/nfe/corrigir-nfe", { id, empresa_id, motivo })
+		$.post(path_url + "fiscal/nfe/corrigir", { id, empresa_id, motivo })
 		.done(res => {
 			let inf = res.retEvento.infEvento
 			swal("Sucesso", `[${inf.cStat}] ${inf.xMotivo}`, "success").then(() => {
@@ -206,7 +206,7 @@ $('#btn-inutiliza-send').click(() => {
 	if (motivo.length < 15)
 		return swal("Alerta", "Informe no mínimo 15 caracteres", "warning")
 
-	$.post(path_url + "api/nfe/inutiliza-nfe", {
+	$.post(path_url + "fiscal/nfe/inutilizar", {
 		empresa_id,
 		motivo,
 		numero_inicial: $('#inp-numero_inicial').val(),

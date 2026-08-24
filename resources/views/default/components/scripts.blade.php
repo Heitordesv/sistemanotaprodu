@@ -22,15 +22,17 @@
 <!--plugins-->
 <script src="/assets/js/jquery.min.js"></script>
 <script type="text/javascript">
-    // O empresa_id enviado pelo navegador não é identidade de tenant. As APIs
-    // fiscais validam este hash e substituem o empresa_id antes do controller.
+    const ajaxHeaders = {
+        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+    };
+
+    // Mantido para os endpoints externos legados. As ações fiscais abertas
+    // pelas telas web resolvem a empresa diretamente da sessão autenticada.
     if (typeof hash !== 'undefined' && hash) {
-        $.ajaxSetup({
-            headers: {
-                'X-Empresa-Hash': hash
-            }
-        });
+        ajaxHeaders['X-Empresa-Hash'] = hash;
     }
+
+    $.ajaxSetup({ headers: ajaxHeaders });
 </script>
 <script src="/assets/js/simplebar.min.js"></script>
 <script src="/assets/js/metisMenu.min.js"></script>

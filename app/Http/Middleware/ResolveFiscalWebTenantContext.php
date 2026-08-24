@@ -6,6 +6,8 @@ use App\Http\Controllers\ConfigNotaController;
 use App\Http\Controllers\NaturezaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\API\GraficoController;
+use App\Http\Controllers\API\NFCeController as ApiNFCeController;
+use App\Http\Controllers\API\NFeController as ApiNFeController;
 use App\Http\Controllers\API\ProdutoController as ApiProdutoController;
 use App\Services\FiscalTenantGuardService;
 use Closure;
@@ -18,6 +20,8 @@ class ResolveFiscalWebTenantContext
         NaturezaController::class,
         ConfigNotaController::class,
         ApiProdutoController::class,
+        ApiNFeController::class,
+        ApiNFCeController::class,
         GraficoController::class,
     ];
 
@@ -41,11 +45,15 @@ class ResolveFiscalWebTenantContext
         }
 
         $empresaId = $this->guard->empresaIdDaSessao($request);
-        $resourceId = $this->firstNumericRouteParameter($request);
+        $resourceId = $this->resourceId($request);
 
         if ($resourceId !== null) {
             if ($controller === ProductController::class) {
                 $this->guard->produto($empresaId, $resourceId);
+            } elseif ($controller === ApiNFeController::class) {
+                $this->guard->venda($empresaId, $resourceId);
+            } elseif ($controller === ApiNFCeController::class) {
+                $this->guard->vendaCaixa($empresaId, $resourceId);
             } elseif ($controller === NaturezaController::class) {
                 $this->guard->natureza($empresaId, $resourceId);
             } elseif (
@@ -70,8 +78,13 @@ class ResolveFiscalWebTenantContext
         return explode('@', $actionName, 2);
     }
 
-    private function firstNumericRouteParameter(Request $request): ?int
+    private function resourceId(Request $request): ?int
     {
+        $inputId = $request->input('id');
+        if (is_scalar($inputId) && ctype_digit((string) $inputId) && (int) $inputId > 0) {
+            return (int) $inputId;
+        }
+
         foreach ((array) optional($request->route())->parameters() as $value) {
             if (is_scalar($value) && ctype_digit((string) $value) && (int) $value > 0) {
                 return (int) $value;
