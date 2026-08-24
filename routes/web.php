@@ -53,6 +53,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmailController;
 
 use App\Http\Controllers\ContaReceberController;
+use App\Http\Controllers\VendaController;
+use App\Http\Controllers\TelaPedidoController;
 
 use App\Http\Controllers\MercadoPagoController;
 
@@ -1166,9 +1168,6 @@ Route::prefix('contasPagar')->group(function () {
     Route::post('/{id}/comprovante', [ContaPagarController::class, 'salvarComprovante'])->name('conta-pagar.comprovante');
 });
 
-
-   // Rota resource para a ContaReceberController
-Route::resource('conta-receber', 'ContaReceberController');
 
 Route::group(['prefix' => 'contasReceber'], function () {
     Route::get('/recorrencias/{id}', 'ContaReceberController@getRecorrencia')->name('conta-receber.recorrencias');
