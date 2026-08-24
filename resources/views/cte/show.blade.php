@@ -32,14 +32,6 @@
 
 				{!!Form::close()!!}
 
-                <div class="mt-5">
-                     <h5>Manifesto</h5>
-                </div>
-                <div>
-                    <a href="{{ route('cte.consultaDocumentos') }}">
-                    <button  type="button" class="btn btn-primary"><i class="bx bx-refresh"></i> Nova consulta de documentos</button>
-                    </a>
-                </div>
                 <h6 class="mt-3">Total de registros:</h6>
 				<hr/>
 				<div class="card">

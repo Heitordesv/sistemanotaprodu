@@ -137,7 +137,7 @@ Route::middleware(['hashEmpresa'])->group(function () {
     Route::get('/resumo_pedidosMaisPedidos', 'API\\GraficoController@resumo_pedidosMaisPedidos');
     Route::get('/contasPagarCategorias', 'API\\GraficoController@contasPagarCategorias');
 
-    // **Fluxo anual no mesmo padr«ªo**
+    // Fluxo anual no mesmo padrao
     Route::get('/fluxoAnual', 'API\\GraficoController@fluxoAnual');
 });
 
@@ -298,17 +298,6 @@ Route::middleware(['authDelivery'])->group(function () {
         Route::post('/ultimo-pedido-confirmar', 'Delivery\\PedidoController@ultimoPedidoParaConfirmar');
         Route::post('/consulta-pedido-lido', 'Delivery\\PedidoController@consultaPedidoLido');
 
-    });
-});
-
-//rotas de delivery cardapio
-Route::middleware(['authDelivery'])->group(function () {
-    Route::group(['prefix' => 'cardapio'], function(){
-        Route::post('/open-table', 'Cardapio\\PedidoController@openTable');
-        Route::post('/get-pedido', 'Cardapio\\PedidoController@getPedido');
-        Route::post('/pedido-save', 'Cardapio\\PedidoController@save');
-
-        Route::get('/mesas', 'Cardapio\\PedidoController@mesas');
     });
 });
 
@@ -526,48 +515,6 @@ Route::group(['prefix' => 'pdv'], function(){
 });
 
 
-//marktplace
-
-Route::group(['prefix' => '/marktplace'], function(){
-    Route::get('/lojas', 'MP\\LojaController@lojas');
-    Route::get('/search', 'MP\\LojaController@search');
-    Route::get('/banners', 'MP\\LojaController@banners');
-    Route::get('/cupons', 'MP\\LojaController@cupons');
-    Route::get('/loja', 'MP\\LojaController@getLoja');
-    Route::get('/categorias', 'MP\\LojaController@categorias');
-    Route::get('/categoriasDeProduto/{loja_id}', 'MP\\ProdutoController@categorias');
-    Route::get('/adicionaisDeProduto', 'MP\\ProdutoController@adicionaisDeProduto');
-    Route::post('/login', 'MP\\LoginController@login');
-
-    Route::get('/avaliacoes', 'MP\\LojaController@avaliacoes');
-
-    Route::group(['prefix' => '/loja'], function(){
-        Route::post('/like', 'MP\\LojaController@like');
-    });
-
-    Route::group(['prefix' => '/cliente'], function(){
-        Route::post('/cadastrar', 'MP\\LoginController@cadastrar');
-        Route::post('/atualizar', 'MP\\LoginController@atualizar');
-        Route::post('/salvarEndereco', 'MP\\LoginController@salvarEndereco');
-        Route::post('/atualizarEndereco', 'MP\\LoginController@atualizarEndereco');
-        Route::get('/find/{cliente_id}', 'MP\\LoginController@find');
-        Route::post('/salvarImagem', 'MP\\LoginController@salvarImagem');
-        
-    });
-
-    Route::group(['prefix' => '/pedidos'], function(){
-        Route::post('/gerarPix', 'MP\\PedidoController@gerarPix');
-        Route::post('/gerarPedido', 'MP\\PedidoController@gerarPedido');
-        Route::post('/gerarPedidoCartao', 'MP\\PedidoController@gerarPedidoCartao');
-        Route::get('/consultaPix/{id}', 'MP\\PedidoController@consultaPix');
-        Route::get('/consultaPedidoLido/{id}', 'MP\\PedidoController@consultaPedidoLido');
-        Route::get('/ultimoPedidoParaConfirmar/{user_id}', 'MP\\PedidoController@ultimoPedidoParaConfirmar');
-        Route::get('/countPedidos/{user_id}', 'MP\\PedidoController@countPedidos');
-        Route::get('/all', 'MP\\PedidoController@all');
-        Route::post('/avaliar', 'MP\\PedidoController@avaliar');
-    });
-});
-
 //app comandas
 
 Route::group(['prefix' => '/controle_comandas'], function(){
@@ -588,4 +535,3 @@ Route::group(['prefix' => '/controle_comandas'], function(){
     Route::get('/pedido/{id}', 'ControleComanda\\HomeController@pedido')->middleware('authAppComanda');
 
 });
-
