@@ -52,7 +52,11 @@
 <script type="text/javascript" src="/js/jquery.mask.min.js"></script>
 <script src="/assets/js/select2.min.js"></script>
 <script src="/assets/js/app.js"></script>
-<script src="/js/main.js"></script>
+@php
+    $mainJs = public_path('js/main.js');
+    $mainJsVersion = file_exists($mainJs) ? filemtime($mainJs) : time();
+@endphp
+<script src="{{ asset('js/main.js') }}?v={{ $mainJsVersion }}"></script>
 <script src="/js/theme.js"></script>
 <script src="https://cdn.ckeditor.com/ckeditor5/35.1.0/classic/ckeditor.js"></script>
 @if(!session('user_contador'))
