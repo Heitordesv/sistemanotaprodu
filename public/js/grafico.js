@@ -214,7 +214,7 @@ Dashboard.formatDateLabel = function (date) {
 };
 
 Dashboard.cards = function (params) {
-    return this.ajaxGet('api/graficos/getDataCards', params, res => {
+    return this.ajaxGet('graficos/dados/getDataCards', params, res => {
         $('.total_vendas').text(this.currency(res.vendas));
         $('.total_vendas_erp').text(this.currency(res.vendas_erp));
         $('.total_vendas_pdv').text(this.currency(res.vendas_pdv));
@@ -260,7 +260,7 @@ Dashboard.cards = function (params) {
 };
 
 Dashboard.vendasAnual = function (params) {
-    return this.ajaxGet('api/graficos/vendasAnual', params, res => {
+    return this.ajaxGet('graficos/dados/vendasAnual', params, res => {
         const labels = res.meses || [];
         const erp = this.numericArray(res.vendas_erp);
         const pdv = this.numericArray(res.vendas_pdv);
@@ -288,7 +288,7 @@ Dashboard.vendasAnual = function (params) {
 };
 
 Dashboard.curvaABC = function (params) {
-    return this.ajaxGet('api/graficos/curvaABC', params, res => {
+    return this.ajaxGet('graficos/dados/curvaABC', params, res => {
         const produtos = res.curva_abc_produtos || [];
         const categorias = produtos.map(item => item.produto_nome);
         const faturamento = produtos.map(item => this.number(item.faturamento));
@@ -325,7 +325,7 @@ Dashboard.curvaABC = function (params) {
 };
 
 Dashboard.contaReceber = function (params) {
-    return this.ajaxGet('api/graficos/contasReceber', params, res => {
+    return this.ajaxGet('graficos/dados/contasReceber', params, res => {
         const recebido = this.number(res.recebidas);
         const receber = this.number(res.receber);
         $('.cr-recebido').text(this.currency(recebido));
@@ -335,7 +335,7 @@ Dashboard.contaReceber = function (params) {
 };
 
 Dashboard.contaPagar = function (params) {
-    return this.ajaxGet('api/graficos/contasPagar', params, res => {
+    return this.ajaxGet('graficos/dados/contasPagar', params, res => {
         const pago = this.number(res.pagos);
         const pagar = this.number(res.pagar);
         $('.cp-pago').text(this.currency(pago));
@@ -345,7 +345,7 @@ Dashboard.contaPagar = function (params) {
 };
 
 Dashboard.contaPagarCategorias = function (params) {
-    return this.ajaxGet('api/graficos/contasPagarCategorias', params, res => {
+    return this.ajaxGet('graficos/dados/contasPagarCategorias', params, res => {
         const labels = res.labels || [];
         const series = this.numericArray(res.valores);
 
@@ -363,7 +363,7 @@ Dashboard.contaPagarCategorias = function (params) {
 };
 
 Dashboard.fluxoAnual = function (params) {
-    return this.ajaxGet('api/graficos/fluxoAnual', params, res => {
+    return this.ajaxGet('graficos/dados/fluxoAnual', params, res => {
         const dados = res.dados || [];
         const categorias = dados.map(item => item.label);
         const entradas = dados.map(item => this.number(item.entrada));
@@ -412,7 +412,7 @@ Dashboard.radialOptions = function (percentual, label) {
 };
 
 Dashboard.produtos = function (params) {
-    return this.ajaxGet('api/graficos/produtos', params, res => {
+    return this.ajaxGet('graficos/dados/produtos', params, res => {
         this.renderChart('chart2', {
             series: [
                 { name: 'Cadastrados', data: this.numericArray(res.somaCadastradoMes) },

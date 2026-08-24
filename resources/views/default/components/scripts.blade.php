@@ -5,6 +5,16 @@
     let host = window.location.host;
     const path_url = prot + "//" + host + "/";
     const hash = '{{session('user_logged')['hash_empresa']}}';
+    window.produtoWebEndpoints = {
+        pesquisa: @json(route('produtos.consulta.pesquisa')),
+        find: @json(url('/produtos/consulta/find')),
+        findByBarcode: @json(route('produtos.consulta.findByBarcode')),
+        findByBarcodeReference: @json(route('produtos.consulta.findByBarcodeReference')),
+        findProdRemessa: @json(route('produtos.consulta.findProdRemessa'))
+    };
+    // Compatibilidade com o seletor legado das telas administrativas.
+    // O PDV possui layout e endpoints proprios e nao usa esta configuracao.
+    window.pdvProdutoEndpoints = window.produtoWebEndpoints;
 
 </script>
 

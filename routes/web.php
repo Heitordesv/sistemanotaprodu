@@ -1148,6 +1148,14 @@ Route::get('/vendas-geral-view', 'RelatorioController@relatorioVendasGeralView')
 
 
 Route::group(['prefix' => 'produtos'], function () {
+    // Consultas usadas pelas telas autenticadas. O middleware verificaEmpresa
+    // substitui o empresa_id pelo tenant selecionado na sessao.
+    Route::get('/consulta/pesquisa', 'API\\ProdutoController@pesquisa')->name('produtos.consulta.pesquisa');
+    Route::get('/consulta/find/{id}', 'API\\ProdutoController@find')->name('produtos.consulta.find');
+    Route::get('/consulta/findByBarcode', 'API\\ProdutoController@findByBarcode')->name('produtos.consulta.findByBarcode');
+    Route::get('/consulta/findByBarcodeReference', 'API\\ProdutoController@findByBarcodeReference')->name('produtos.consulta.findByBarcodeReference');
+    Route::get('/consulta/findProdRemessa', 'API\\ProdutoController@findProdRemessa')->name('produtos.consulta.findProdRemessa');
+
     Route::get('/auditoria-tributaria', 'ProductController@auditoriaTributaria')->name('produtos.auditoria-tributaria');
     Route::post('/auditoria-tributaria/analisar', 'ProductController@analisarTributacao')->name('produtos.auditoria-tributaria.analisar');
     // Nova rota para Alertas de Vencimento e Lote
@@ -1467,6 +1475,10 @@ Route::resource('funcionarios', FuncionarioController::class);
     Route::resource('servicos', 'ServiceController');
 
     Route::group(['prefix' => 'ordemServico'], function () {
+        // Produtos da OS resolvidos pela empresa autenticada na sessão web.
+        Route::get('/produtos/pesquisa', 'API\\ProdutoController@pesquisa')->name('ordemServico.produtos.pesquisa');
+        Route::get('/produtos/find/{id}', 'API\\ProdutoController@find')->name('ordemServico.produtos.find');
+        Route::get('/produtos/findByBarcode', 'API\\ProdutoController@findByBarcode')->name('ordemServico.produtos.findByBarcode');
         // Route::get('/', 'OrderController@index');
         // Route::get('/new', 'OrderController@new');
         // Route::get('/servicosordem/{id}', 'OrderController@servicosordem');
@@ -1728,6 +1740,15 @@ Route::get('/storeApontamentomanual', 'StockController@storeApontamentomanual')
 Route::get('/api/graficos/contasPagar/categoria', [GraficoController::class, 'contasPagarPorCategoria']);
 
     Route::group(['prefix' => 'graficos'], function () {
+        // Dados do dashboard resolvidos pela empresa autenticada na sessão web.
+        Route::get('/dados/getDataCards', 'API\\GraficoController@getDataCards')->name('graficos.dados.cards');
+        Route::get('/dados/vendasAnual', 'API\\GraficoController@vendasAnual')->name('graficos.dados.vendas');
+        Route::get('/dados/curvaABC', 'API\\GraficoController@curvaABC')->name('graficos.dados.curva-abc');
+        Route::get('/dados/contasReceber', 'API\\GraficoController@contasReceber')->name('graficos.dados.contas-receber');
+        Route::get('/dados/contasPagar', 'API\\GraficoController@contasPagar')->name('graficos.dados.contas-pagar');
+        Route::get('/dados/contasPagarCategorias', 'API\\GraficoController@contasPagarCategorias')->name('graficos.dados.contas-pagar-categorias');
+        Route::get('/dados/fluxoAnual', 'API\\GraficoController@fluxoAnual')->name('graficos.dados.fluxo');
+        Route::get('/dados/produtos', 'API\\GraficoController@produtos')->name('graficos.dados.produtos');
         Route::get('/faturamentoDosUltimosSeteDias', 'HomeController@faturamentoDosUltimosSeteDias');
         Route::get('/faturamentoFiltrado', 'HomeController@faturamentoFiltrado');
         Route::get('/boxConsulta/{dias}', 'HomeController@boxConsulta');

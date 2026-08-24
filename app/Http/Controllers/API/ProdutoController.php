@@ -443,10 +443,13 @@ public function pesquisa(Request $request)
     {
         $cliente = null;
         if (isset($request->cliente_id)) {
-            $cliente = Cliente::find($request->cliente_id);
+            $cliente = Cliente::where('id', $request->cliente_id)
+                ->where('empresa_id', $request->empresa_id)
+                ->first();
         }
         $item = Produto::where('id', $request->produto_id)
-        ->first();
+            ->where('empresa_id', $request->empresa_id)
+            ->firstOrFail();
 
         $item->cfop_atual = $item->cfop_estadual;
 

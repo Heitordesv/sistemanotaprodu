@@ -111,6 +111,14 @@
             let prot = window.location.protocol;
             let host = window.location.host;
             const path_url = prot + "//" + host + "/";
+            window.produtoWebEndpoints = {
+                pesquisa: @json(route('produtos.consulta.pesquisa')),
+                find: @json(url('/produtos/consulta/find')),
+                findByBarcode: @json(route('produtos.consulta.findByBarcode')),
+                findByBarcodeReference: @json(route('produtos.consulta.findByBarcodeReference')),
+                findProdRemessa: @json(route('produtos.consulta.findProdRemessa'))
+            };
+            window.pdvProdutoEndpoints = window.produtoWebEndpoints;
         </script>
 
         <script src="/assets/js/bootstrap.bundle.min.js"></script>
@@ -120,7 +128,7 @@
         <script type="text/javascript" src="/js/jquery.mask.min.js"></script>
         <script src="/assets/js/select2.min.js"></script>
         <script src="/js/main.js"></script>
-        <script src="/js/pre_venda.js"></script>
+        <script src="{{ asset('js/pre_venda.js') }}?v={{ filemtime(public_path('js/pre_venda.js')) }}"></script>
         <script src="/js/theme.js"></script>
         <script src="/assets/js/toastr.min.js"></script>
         

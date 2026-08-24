@@ -21,7 +21,7 @@
         $("#inp-produto_id").change(() => {
             let product_id = $("#inp-produto_id").val()
             if (product_id) {
-                $.get(path_url + "api/produtos/find/" + product_id)
+                $.get(window.produtoWebEndpoints.find + "/" + product_id)
                     .done((e) => {
                         $('#inp-quantidade').val('1,00')
                         $('#inp-valor_unitario').val(convertFloatToMoeda(e.valor_venda))

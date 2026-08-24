@@ -190,7 +190,7 @@
             $("#inp-produto_id").change(() => {
                 let product_id = $("#inp-produto_id").val()
                 if(product_id){
-                    $.get(path_url + "api/produtos/find/"+product_id)
+                    $.get(window.produtoWebEndpoints.find + "/" + product_id)
                     .done((e) => {
 
                         $('#inp-quantidade').val('1,00')
@@ -219,7 +219,7 @@
     $('#inp-produto_id').change(() => {
         let id = $('#inp-produto_id').val()
 
-        $.get(path_url + "api/produtos/find/"+id)
+        $.get(window.produtoWebEndpoints.find + "/" + id)
         .done((e) => {
             console.log(e);
             $('#inp-nome').val(e.nome)

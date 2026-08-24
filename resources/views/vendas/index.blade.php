@@ -341,6 +341,6 @@
 @section('js')
 
 <script type="text/javascript" src="/js/nf.js"></script>
-<script type="text/javascript" src="/js/vendas.js"></script>
+<script type="text/javascript" src="{{ asset('js/vendas.js') }}?v={{ filemtime(public_path('js/vendas.js')) }}"></script>
 
 @endsection

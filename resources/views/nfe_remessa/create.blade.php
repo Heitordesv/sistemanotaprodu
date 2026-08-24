@@ -58,7 +58,7 @@
 <script type="text/javascript" src="/js/client.js"></script>
 {{-- <script type="text/javascript" src="/js/vendas.js"></script> --}}
 <script type="text/javascript" src="/js/product.js"></script>
-<script type="text/javascript" src="/js/nfeRemessa.js"></script>
+<script type="text/javascript" src="{{ asset('js/nfeRemessa.js') }}?v={{ filemtime(public_path('js/nfeRemessa.js')) }}"></script>
 <script type="text/javascript" src="/js/transportadora.js"></script>
 
 

@@ -1,6 +1,13 @@
 @extends('default.layout', ['title' => 'Ordem de serviço'])
 <script src="https://cdn.tailwindcss.com"></script>
 @section('content')
+<script>
+    window.pdvProdutoEndpoints = {
+        pesquisa: @json(route('ordemServico.produtos.pesquisa')),
+        find: @json(url('/ordemServico/produtos/find')),
+        findByBarcode: @json(route('ordemServico.produtos.findByBarcode'))
+    };
+</script>
 <div class="p-6 bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
         
@@ -232,7 +239,11 @@
 </div>
 
 @section('js')
-<script type="text/javascript" src="/js/ordem_servico.js"></script>
+@php
+    $ordemServicoJs = public_path('js/ordem_servico.js');
+    $ordemServicoVersao = file_exists($ordemServicoJs) ? filemtime($ordemServicoJs) : time();
+@endphp
+<script type="text/javascript" src="{{ asset('js/ordem_servico.js') }}?v={{ $ordemServicoVersao }}"></script>
 @endsection
 
 @endsection

@@ -249,14 +249,22 @@ class OrderController extends Controller
     public function storeProduto(Request $request)
     {
         try {
+            $empresaId = (int) $request->empresa_id;
+            $ordem = OrdemServico::where('id', (int) $request->ordem_servico_id)
+                ->where('empresa_id', $empresaId)
+                ->firstOrFail();
+            $produto = Produto::where('id', (int) $request->produto_id)
+                ->where('empresa_id', $empresaId)
+                ->firstOrFail();
+
             ProdutoOs::create([
-                'produto_id' => $request->produto_id,
-                'ordem_servico_id' => $request->ordem_servico_id,
+                'produto_id' => $produto->id,
+                'ordem_servico_id' => $ordem->id,
                 'quantidade' => __convert_value_bd($request->quantidade),
                 'valor_unitario' => __convert_value_bd($request->valor_unitario),
                 'sub_total' => __convert_value_bd($request->valor_unitario) * __convert_value_bd($request->quantidade),
             ]);
-            $this->calcTotal($request->ordem_servico_id);
+            $this->calcTotal($ordem->id);
 
             session()->flash("flash_sucesso", "Produto adicionado!");
         } catch (\Exception $e) {
