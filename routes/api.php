@@ -4,7 +4,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\API\GraficoController;
-use App\Http\Controllers\InterPixController;
 use App\Http\Controllers\API\VendaCaixaController;
 use App\Http\Controllers\VendaPixController;
 
@@ -27,7 +26,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::get('graficos/curvaABC', [GraficoController::class, 'curvaABC']);
 
 Route::post('/webhook/whatsapp-status', [WebhookController::class, 'handle']);
-Route::get('/interpix/token', [InterPixController::class, 'autenticar']);
 Route::get('/venda-pix/gerar-pix/{id}', [VendaPixController::class, 'gerarPix']);
 
 Route::post('/api/venda-caixa/aprovar/{id}', [VendaCaixaController::class, 'aprovarPedido']);
