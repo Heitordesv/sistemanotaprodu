@@ -522,6 +522,43 @@ $("#inp-sub_categoria_id").select2({
 });
 
 var input_product = document.querySelector('.produto_id');
+var produtoPesquisaUrl = window.pdvProdutoEndpoints && window.pdvProdutoEndpoints.pesquisa
+    ? window.pdvProdutoEndpoints.pesquisa
+    : (window.produtoWebEndpoints ? window.produtoWebEndpoints.pesquisa : null);
+
+function produtoFilialSelecionada() {
+    var $filial = $('.filial_id').first();
+
+    if (!$filial.length) {
+        $filial = $('#filial_id').first();
+    }
+
+    return $filial.length ? $filial.val() : null;
+}
+
+function processarProdutosSelect2(response) {
+    var produtos = Array.isArray(response) ? response : (response && response.data ? response.data : []);
+    var results = [];
+
+    $.each(produtos, function (i, v) {
+        var grade = v.str_grade || '';
+        var valorVenda = Number(v.valor_venda || 0);
+        var o = {
+            id: v.id,
+            text: (v.nome || 'Produto sem nome') + ' ' + grade,
+            value: v.id
+        };
+
+        o.text += ' | R$ ' + valorVenda.toFixed(casas_decimais).replace('.', ',');
+        if (v.estoque) {
+            o.text += ' | estoque: ' + Number(v.estoque.quantidade || 0);
+        }
+        results.push(o);
+    });
+
+    return { results: results };
+}
+
 $("#inp-produto_id").select2({
     minimumInputLength: 2,
     language: "pt-BR",
@@ -531,41 +568,16 @@ $("#inp-produto_id").select2({
 
     ajax: {
         cache: true,
-        url: window.pdvProdutoEndpoints
-            ? window.pdvProdutoEndpoints.pesquisa
-            : path_url + "api/produtos/pesquisa",
+        delay: 250,
+        url: produtoPesquisaUrl,
         dataType: "json",
         data: function (params) {
-            // console.clear();
-            var query = {
-                pesquisa: params.term,
-                empresa_id: $("#empresa_id").val(),
-                usuario_id: $("#usuario_id").val(),
-                filial_id: $(".filial_id") ? $(".filial_id").val() : null
-            };
-            return query;
-        },
-        processResults: function (response) {
-            console.log("response", response);
-            var results = [];
-
-            $.each(response, function (i, v) {
-                var o = {};
-                o.id = v.id;
-
-                o.text = v.nome + " " + v.str_grade
-                o.text += " | R$ " + parseFloat(v.valor_venda).toFixed(casas_decimais).replace(".", ",")
-                if(v.estoque){
-                    o.text += " | estoque: " + v.estoque.quantidade
-                }
-                o.value = v.id;
-
-                results.push(o);
-            });
             return {
-                results: results,
+                pesquisa: params.term,
+                filial_id: produtoFilialSelecionada()
             };
         },
+        processResults: processarProdutosSelect2,
     },
 });
 
@@ -577,41 +589,16 @@ $(".produto_id").select2({
     theme: "bootstrap4",
     ajax: {
         cache: true,
-        url: window.pdvProdutoEndpoints
-            ? window.pdvProdutoEndpoints.pesquisa
-            : path_url + "api/produtos/pesquisa",
+        delay: 250,
+        url: produtoPesquisaUrl,
         dataType: "json",
         data: function (params) {
-            // console.clear();
-            var query = {
-                pesquisa: params.term,
-                empresa_id: $("#empresa_id").val(),
-                usuario_id: $("#usuario_id").val(),
-                filial_id: $(".filial_id") ? $(".filial_id").val() : null
-            };
-            return query;
-        },
-        processResults: function (response) {
-            console.log("response", response);
-            var results = [];
-
-            $.each(response, function (i, v) {
-                var o = {};
-                o.id = v.id;
-
-                o.text = v.nome + " " + v.str_grade
-                o.text += " | R$ " + parseFloat(v.valor_venda).toFixed(casas_decimais).replace(".", ",")
-                if(v.estoque){
-                    o.text += " | estoque: " + v.estoque.quantidade
-                }
-                o.value = v.id;
-
-                results.push(o);
-            });
             return {
-                results: results,
+                pesquisa: params.term,
+                filial_id: produtoFilialSelecionada()
             };
         },
+        processResults: processarProdutosSelect2,
     },
 });
 
