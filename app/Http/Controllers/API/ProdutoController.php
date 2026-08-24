@@ -9,6 +9,7 @@ use App\Models\Produto;
 use App\Models\DivisaoGrade;
 use App\Models\Empresa;
 use App\Models\Estoque;
+use App\Services\PdvListaPrecoService;
 use Illuminate\Http\Request;
 
 class ProdutoController extends Controller
@@ -168,18 +169,41 @@ public function pesquisa(Request $request)
     return response()->json($temp, 200);
 }
    
-    public function find($id)
-{
-    $item = Produto::with(['estoque', 'categoria'])
-        ->findOrFail($id);
+    public function find(
+        $id,
+        Request $request,
+        PdvListaPrecoService $listaPrecoService
+    ) {
+        $query = Produto::with(['estoque', 'categoria'])
+            ->where('id', (int) $id);
 
-    return response()->json($item);
-}
-    public function findByBarcode(Request $request)
-    {
+        if ($request->filled('empresa_id')) {
+            $query->where('empresa_id', (int) $request->empresa_id);
+        }
+
+        $item = $query->firstOrFail();
+
+        if ($request->filled('empresa_id')) {
+            $listaPrecoService->aplicarAoProduto(
+                $item,
+                $request->filled('lista_preco_id')
+                    ? (int) $request->lista_preco_id
+                    : null,
+                (int) $request->empresa_id
+            );
+        }
+
+        return response()->json($item);
+    }
+
+    public function findByBarcode(
+        Request $request,
+        PdvListaPrecoService $listaPrecoService
+    ) {
         $request->validate([
             'barcode' => 'required|string|max:64',
             'empresa_id' => 'required|integer',
+            'lista_preco_id' => 'nullable|integer',
         ]);
 
         $item = Produto::with(['estoque', 'categoria'])
@@ -193,16 +217,13 @@ public function pesquisa(Request $request)
             ], 404);
         }
 
-        $valor = (float) $item->valor_venda;
-        if (
-            $item->categoria &&
-            $item->categoria->desconto_ativo == 1 &&
-            (float) $item->categoria->desconto > 0
-        ) {
-            $valor -= $valor * ((float) $item->categoria->desconto / 100);
-        }
-
-        $item->setAttribute('valor_venda_pdv', round($valor, 2));
+        $listaPrecoService->aplicarAoProduto(
+            $item,
+            $request->filled('lista_preco_id')
+                ? (int) $request->lista_preco_id
+                : null,
+            (int) $request->empresa_id
+        );
 
         return response()->json($item, 200);
     }
