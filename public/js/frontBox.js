@@ -1,3 +1,95 @@
+
+function listaPrecoPdvId() {
+    return $('#lista-precos-pdv').val() || '';
+}
+
+function consultarPrecoPdv(produtoId) {
+    return $.get(path_url + 'api/produtos/find/' + produtoId, {
+        empresa_id: $('#empresa_id').val(),
+        lista_preco_id: listaPrecoPdvId()
+    });
+}
+
+function recalcularItensPorListaPreco() {
+    var linhas = $('.table-itens tbody tr').filter(function () {
+        return $(this).find('input[name="produto_id[]"]').length > 0;
+    });
+
+    if (!linhas.length) {
+        return $.Deferred().resolve().promise();
+    }
+
+    var consultas = [];
+
+    linhas.each(function () {
+        var linha = $(this);
+        var produtoId = linha.find('input[name="produto_id[]"]').val();
+
+        consultas.push(
+            consultarPrecoPdv(produtoId).then(function (produto) {
+                var valor = Number(
+                    produto.valor_venda_pdv !== undefined
+                        ? produto.valor_venda_pdv
+                        : produto.valor_venda
+                );
+                var quantidade = convertMoedaToFloat(
+                    linha.find('input[name="quantidade[]"]').val()
+                );
+
+                linha.find('input[name="valor_unitario[]"]').val(
+                    convertFloatToMoeda(valor)
+                );
+                linha.find('input[name="subtotal_item[]"]').val(
+                    convertFloatToMoeda(valor * quantidade)
+                );
+            })
+        );
+    });
+
+    return $.when.apply($, consultas).then(function () {
+        calcTotal();
+    });
+}
+
+$(document).on('change', '#lista-precos-pdv', function () {
+    var campo = $(this);
+    var valorAnterior = campo.data('valor-anterior');
+
+    campo.prop('disabled', true);
+
+    recalcularItensPorListaPreco()
+        .done(function () {
+            campo.data('valor-anterior', campo.val());
+
+            if ($('.table-itens tbody input[name="produto_id[]"]').length) {
+                swal(
+                    'Lista de preços aplicada',
+                    'Os preços dos produtos foram atualizados.',
+                    'success'
+                );
+            }
+        })
+        .fail(function (xhr) {
+            campo.val(valorAnterior || '');
+            swal(
+                'Não foi possível aplicar a lista',
+                (xhr.responseJSON && xhr.responseJSON.message) ||
+                    'Confira se a lista pertence à empresa e tente novamente.',
+                'warning'
+            );
+        })
+        .always(function () {
+            campo.prop('disabled', false);
+        });
+});
+
+$(function () {
+    $('#lista-precos-pdv').data(
+        'valor-anterior',
+        $('#lista-precos-pdv').val() || ''
+    );
+});
+
 var TOTAL = 0;
 var caixaAberto = false;
 var DESCONTO = 0;
@@ -144,27 +236,23 @@ $(function () {
 
         if (product_id) {
 
-            $.get(path_url + "api/produtos/find/" + product_id)
+            $.get(path_url + "api/produtos/find/" + product_id, {
+                empresa_id: $('#empresa_id').val(),
+                lista_preco_id: listaPrecoPdvId()
+            })
             .done((e) => {
 
                 $("#inp-quantidade").val("1,00");
 
-                let valorOriginal = parseFloat(e.valor_venda);
-                let valorFinal = valorOriginal;
+                let valorFinal = parseFloat(
+                    e.valor_venda_pdv !== undefined ? e.valor_venda_pdv : e.valor_venda
+                );
 
-                // 🔥 VERIFICA DESCONTO DA CATEGORIA
-                if (
-                    e.categoria &&
-                    e.categoria.desconto_ativo == 1 &&
-                    parseFloat(e.categoria.desconto) > 0
-                ) {
-                    let desconto = parseFloat(e.categoria.desconto);
-
-                    valorFinal = valorOriginal - (valorOriginal * desconto / 100);
-
+                if (parseFloat(e.percentual_desconto_categoria_pdv || 0) > 0) {
                     swal(
                         "🎉 Produto com desconto!",
-                        "Categoria " + e.categoria.nome + " com " + desconto + "% de desconto aplicado.",
+                        "Categoria " + e.categoria.nome + " com " +
+                            e.percentual_desconto_categoria_pdv + "% de desconto aplicado.",
                         "success"
                     );
                 }
@@ -232,6 +320,7 @@ $(".btn-add-item").click(() => {
                         sub_total: sub_total,
                         product_id: product_id,
                         empresa_id: $('#empresa_id').val(),
+                        lista_preco_id: listaPrecoPdvId(),
                     };
                     $.get(path_url + "api/frenteCaixa/linhaProdutoVenda", dataRequest)
                     .done((e) => {
@@ -903,6 +992,7 @@ $('#form-pdv').on('submit', function (e) {
     var json = $(this).serializeFormJSON();
     json.empresa_id = $('#empresa_id').val();
     json.usuario_id = $('#usuario_id').val();
+    json.lista_preco_id = listaPrecoPdvId();
     json.desconto = DESCONTO;
     json.desconto_tipo = DESCONTO_TIPO;
     json.desconto_valor = DESCONTO_VALOR_INFORMADO;
@@ -1081,7 +1171,8 @@ function processarCodigoBarras(codigo) {
 
     $.get(path_url + 'api/produtos/findByBarcode', {
         barcode: codigo,
-        empresa_id: $('#empresa_id').val()
+        empresa_id: $('#empresa_id').val(),
+        lista_preco_id: listaPrecoPdvId()
     })
         .done(adicionarProdutoDoLeitor)
         .fail((xhr) => {
@@ -1162,7 +1253,8 @@ function enviarProdutoParaTabela(productId, quantidade, valorUnitario, subtotal)
         value_unit: valorUnitario,
         sub_total: subtotal,
         product_id: productId,
-        empresa_id: $('#empresa_id').val()
+        empresa_id: $('#empresa_id').val(),
+        lista_preco_id: listaPrecoPdvId()
     })
         .done((linha) => {
             $('.table-itens tbody').append(linha);
