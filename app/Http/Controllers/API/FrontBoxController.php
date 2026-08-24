@@ -5,15 +5,19 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Produto;
 use App\Models\VendaCaixa;
+use App\Services\PdvListaPrecoService;
 use Illuminate\Http\Request;
 
 class FrontBoxController extends Controller
 {
-    public function linhaProdutoVenda(Request $request)
-    {
+    public function linhaProdutoVenda(
+        Request $request,
+        PdvListaPrecoService $listaPrecoService
+    ) {
         $request->validate([
             'product_id' => 'required|integer',
             'empresa_id' => 'required|integer',
+            'lista_preco_id' => 'nullable|integer',
             'qtd' => 'required',
             'value_unit' => 'required',
             'sub_total' => 'required',
@@ -24,10 +28,22 @@ class FrontBoxController extends Controller
         $sub_total = __convert_value_bd($request->sub_total);
         $key = $request->key;
 
-        $product = Produto::query()
+        $product = Produto::with('categoria')
             ->where('id', (int) $request->product_id)
             ->where('empresa_id', (int) $request->empresa_id)
             ->firstOrFail();
+
+        if ($request->filled('lista_preco_id')) {
+            $value_unit = $listaPrecoService->precoPdv(
+                $product,
+                (int) $request->lista_preco_id,
+                (int) $request->empresa_id
+            );
+            $sub_total = round(
+                __convert_value_bd($request->qtd) * $value_unit,
+                2
+            );
+        }
 
         return view(
             'frontBox.partials.row_frontBox',
