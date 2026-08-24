@@ -196,7 +196,7 @@
 </div>
 
 @section('js')
-<script src="/js/pedidos.js"></script>
+<script src="{{ asset('js/pedidos.js') }}?v={{ filemtime(public_path('js/pedidos.js')) }}"></script>
 @endsection
 
 @endsection

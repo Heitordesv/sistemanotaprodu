@@ -35,7 +35,7 @@
         }
     </script>
 
-    <script type="text/javascript" src="/js/compra.js"></script>
+    <script type="text/javascript" src="{{ asset('js/compra.js') }}?v={{ filemtime(public_path('js/compra.js')) }}"></script>
 @endsection
 
 @include('modals._produto', ['not_submit' => true])

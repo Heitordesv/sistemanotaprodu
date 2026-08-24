@@ -28,7 +28,7 @@
 
 @section('js')
 <script type="text/javascript" src="/js/client.js"></script>
-<script type="text/javascript" src="/js/ordem_servico.js"></script>
+<script type="text/javascript" src="{{ asset('js/ordem_servico.js') }}?v={{ filemtime(public_path('js/ordem_servico.js')) }}"></script>
 @endsection
 
 @include('modals._client', ['not_submit' => true])

@@ -94,7 +94,7 @@ $(".modal .select2").each(function () {
 $("#inp-produto").change(() => {
     let product_id = $("#inp-produto").val()
     if (product_id) {
-        $.get(path_url + "api/produtos/find/" + product_id)
+        $.get(window.produtoWebEndpoints.find + "/" + product_id)
             .done((e) => {
                 $('#inp-quantidade').val('1,00')
                 $('#inp-valor').val(convertFloatToMoeda(e.valor_venda))

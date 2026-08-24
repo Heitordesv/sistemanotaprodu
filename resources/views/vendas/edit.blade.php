@@ -58,7 +58,7 @@
 
 </script>
 <script type="text/javascript" src="/js/client.js"></script>
-<script type="text/javascript" src="/js/vendas.js"></script>
+<script type="text/javascript" src="{{ asset('js/vendas.js') }}?v={{ filemtime(public_path('js/vendas.js')) }}"></script>
 <script type="text/javascript" src="/js/product.js"></script>
 <script type="text/javascript" src="/js/transportadora.js"></script>
 

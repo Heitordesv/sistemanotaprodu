@@ -115,7 +115,7 @@ $(document).on("change", ".produto_id", function () {
         $CST_COFINS = $CST_PIS.closest('td').next().find('select');
         $CST_IPI = $CST_COFINS.closest('td').next().find('select');
 
-        $.get(path_url + "api/produtos/findProdRemessa", {produto_id: product_id, cliente_id: $('#inp-cliente_id').val()})
+        $.get(window.produtoWebEndpoints.findProdRemessa, {produto_id: product_id, cliente_id: $('#inp-cliente_id').val()})
         .done((e) => {
             $qtd.val('1,00')
             $vlUnit.val(convertFloatToMoeda(e.valor_venda))

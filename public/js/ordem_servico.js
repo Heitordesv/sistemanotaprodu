@@ -86,7 +86,8 @@ $(function () {
 $("#inp-produto_id").change(() => {
     let product_id = $("#inp-produto_id").val()
     if (product_id) {
-        $.get(path_url + "api/produtos/find/" + product_id)
+        const findUrl = window.pdvProdutoEndpoints.find + "/" + product_id;
+        $.get(findUrl)
         .done((e) => {
             $('.qtd_produto').val('1,00')
             $('.valor_produto').val(convertFloatToMoeda(e.valor_venda))
@@ -173,10 +174,9 @@ $(function () {
         $searchButton.prop('disabled', true);
         setFeedback('Buscando o código ' + code + '...', 'info');
 
-        $.get(path_url + 'api/produtos/findByBarcode', {
-            barcode: code,
-            empresa_id: $('#empresa_id').val()
-        }).done(function (product) {
+        const barcodeUrl = window.pdvProdutoEndpoints.findByBarcode;
+
+        $.get(barcodeUrl, { barcode: code }).done(function (product) {
             if (!product || !product.id) {
                 setFeedback('Nenhum produto encontrado para o código ' + code + '.', 'error');
                 $barcode.select();
