@@ -53,6 +53,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmailController;
 
 use App\Http\Controllers\ContaReceberController;
+use App\Http\Controllers\VendaController;
+use App\Http\Controllers\TelaPedidoController;
 
 use App\Http\Controllers\MercadoPagoController;
 
@@ -131,9 +133,6 @@ Route::post('/consulta-veiculo/pdf', [ConsultaVeiculoController::class, 'gerarPd
 
 Route::get('/emails', [EmailController::class, 'index'])->name('emails.index');
 Route::post('/emails/enviar', [EmailController::class, 'enviar'])->name('emails.enviar');
-   Route::post('/receber-massa', [ContaReceberController::class, 'receberMassa'])
-        ->name('conta-receber.receber.massa');
-        
 Route::post('/conta-receber/pix-massa', [ContaReceberController::class, 'pixMassa'])->name('conta-receber.pix.massa');
 Route::post('/conta-receber/verificar-massa', [ContaReceberController::class, 'verificarMassa'])->name('conta-receber.verificar.massa');
         
@@ -237,14 +236,6 @@ Route::post('/mercadopago/notification/plano/{planoEmpresaId}', [PagamentoPlanoC
 
 
 
-Route::get('/empresa/{empresaId}/planos/gerar-pix/{planoId}', [PagamentoPlanoController::class, 'gerarPixPlano'])
-    ->name('empresa.plano.gerarPix');
-
-Route::post('/mercadopago/notification/plano/{planoEmpresaId}', [PagamentoPlanoController::class, 'notification']);
-
-
-
-
 Route::get('/pg/{id}', [PaymentController::class, 'linkPublico'])
     ->name('pg.link.publico');
 
@@ -264,9 +255,6 @@ Route::get('/pagamento/{token}', [PaymentController::class, 'linkPublicoEmpresa'
     ->name('payment.publico.empresa');
 
 // Rotas de API
-Route::get('/payment/gerar-pix/{token}', [PaymentController::class, 'gerarPixMercadoPagos'])
-    ->name('payment.gerar.pix');
-
 Route::get('/payment/verificar-statuss/{token}', [PaymentController::class, 'verificarStatus'])
     ->name('payment.verificar.status');
 
@@ -409,19 +397,11 @@ Route::get('/empresa/{nomeLink}/minhas-faturas', [LinkController::class, 'minhas
 
 Route::get('/{nomeLink}/catalogo.xml', [LinkController::class, 'xmlFeed']);
 
-// Nova rota para atualizar o status de um lead
-Route::patch('/leads/{id}/status', [LeadController::class, 'updateStatus'])->name('leads.updateStatus');
-
 // Opcional: Rotas para editar/atualizar os dados principais do lead
 // Route::get('/leads/{id}/edit', [LeadController::class, 'edit'])->name('leads.edit');
 // Route::put('/leads/{id}', [LeadController::class, 'update'])->name('leads.update');
 // routes/web.php (ou api.php)
 // ... outras rotas ...
-Route::delete('/leads/{id}', [LeadController::class, 'destroy'])->name('leads.destroy');
-// routes/web.php
-Route::get('/leads/create', [LeadController::class, 'create'])->name('leads.create');
-
-
 Route::get('/api/leads', [LeadController::class, 'getLeadsJson'])->name('api.leads.json');
 
 Route::get('/graficos', [GraficoController::class, 'mostrarContratoForm'])->name('graficos.form');
@@ -438,10 +418,6 @@ Route::get('/fluxoAnual', [GraficoController::class, 'fluxoAnual']);
 Route::get('/novoparceiro', 'UserController@novoparceiro');
 Route::get('/ajuste', 'EmpresaController@ajuste');
 
-
-Route::group(['prefix' => '/ajax'], function () {
-    Route::get('/', 'AjaxController@index');
-});
 
 Route::get('/', function () {
     // Route::get('/', 'DeliveryController@index');
@@ -460,11 +436,6 @@ Route::post('/responseSave', 'CotacaoResponseController@responseSave');
 
 Route::get('/error', function () {
     return view('sempermissao')->with('title', 'Acesso Bloqueado');
-});
-
-Route::group(['prefix' => 'migrador'], function () {
-    Route::get('/{empresa_id}', 'MigradorController@index');
-    Route::post('/', 'MigradorController@save');
 });
 
 Route::group(['prefix' => 'online', 'middleware' => 'verificaEmpresa'], function () {
@@ -497,8 +468,6 @@ Route::group(['prefix' => '/payment', 'middleware' => 'verificaEmpresa'], functi
     Route::get('/', 'PaymentController@index')->name('payment.index');
     Route::post('/payment-pix', 'PaymentController@paymentPix')->name('payment.pix');
     Route::post('/payment-card', 'PaymentController@paymentCard')->name('payment.card');
-        Route::get('finish/', 'RecorrenciaController@index')->name('payment.finish');
-
    // Route::get('/finish', 'PaymentController@finish')->name('payment.finish');
     Route::post('/setPlano', 'PaymentController@setPlano');
     Route::get('/{code}', 'PaymentController@detalhesPagamento')->name('payment.detail');
@@ -548,14 +517,6 @@ Route::middleware([
    Route::post('/store', 'TelaPedidoController@store')->name('tela-pedido.store');
 
 
-    Route::get('/motoboy', 'MotoboyController@index')->name('motoboy.index');
-    Route::get('/motoboy/create', 'MotoboyController@create')->name('motoboy.create');
-    Route::post('/motoboy', 'MotoboyController@store')->name('motoboy.store');
-    Route::get('/motoboy/{id}', 'MotoboyController@show')->name('motoboy.show');
-    Route::get('/motoboy/{id}/edit', 'MotoboyController@edit')->name('motoboy.edit');
-    Route::put('/motoboy/{id}', 'MotoboyController@update')->name('motoboy.update');
-    Route::delete('/motoboy/{id}', 'MotoboyController@destroy')->name('motoboy.destroy');
-
 // Exibe o formulário para cadastrar motoboy
 Route::get('/motoboy', 'TelaPedidoController@motoboyView')->name('tela_pedido.motoboy');
 
@@ -576,68 +537,68 @@ Route::post('/forma_pagamento', 'TelaPedidoController@formaPagemento')->name('te
 });
 Route::group(['prefix' => 'itens'], function () {
     // Rota para exibir os itens
-    Route::get('/', 'App\Http\Controllers\ItemController@index')->name('itens.index');
+    Route::get('/', 'ItemController@index')->name('itens.index');
 
     // Rota para exibir o formulário de criação de novo item
-    Route::get('/create', 'App\Http\Controllers\ItemController@create')->name('itens.create');
+    Route::get('/create', 'ItemController@create')->name('itens.create');
 
     // Rota para salvar o novo item
-    Route::post('/store', 'App\Http\Controllers\ItemController@store')->name('itens.store');
+    Route::post('/store', 'ItemController@store')->name('itens.store');
 
     // Rota para exibir o formulário de edição de item
-    Route::get('/{id}/edit', 'App\Http\Controllers\ItemController@edit')->name('itens.edit');
+    Route::get('/{id}/edit', 'ItemController@edit')->name('itens.edit');
 
     // Rota para atualizar o item
-    Route::put('/{id}', 'App\Http\Controllers\ItemController@update')->name('itens.update');
+    Route::put('/{id}', 'ItemController@update')->name('itens.update');
 
     // Rota para excluir o item
-    Route::delete('/{id}', 'App\Http\Controllers\ItemController@destroy')->name('itens.destroy');
+    Route::delete('/{id}', 'ItemController@destroy')->name('itens.destroy');
 
     // Rota para exibir as categorias de um item específico, passando o user_id
-    Route::get('/create/{user_id}', 'App\Http\Controllers\ItemController@showCategorias')->name('itens.showCategorias');
+    Route::get('/create/{user_id}', 'ItemController@showCategorias')->name('itens.showCategorias');
 
     // Rota para atualizar a disponibilidade do item
-    Route::post('/atualizar-disponibilidade', 'App\Http\Controllers\ItemController@atualizarDisponibilidade')->name('itens.atualizar-disponibilidade');
+    Route::post('/atualizar-disponibilidade', 'ItemController@atualizarDisponibilidade')->name('itens.atualizar-disponibilidade');
 });
 
 Route::group(['prefix' => 'bairros_delivery'], function () {
     // Rota para exibir os bairros com filtros e paginação
-    Route::get('/', 'App\Http\Controllers\BairroDeliveryController@index')->name('bairrosDelivery.index');
+    Route::get('/', 'BairroDeliveryController@index')->name('bairrosDelivery.underscore.index');
 
     // Rota para exibir o formulário de criação de um novo bairro
-    Route::get('/create', 'App\Http\Controllers\BairroDeliveryController@create')->name('bairrosDelivery.create');
+    Route::get('/create', 'BairroDeliveryController@create')->name('bairrosDelivery.underscore.create');
 
     // Rota para salvar um novo bairro
-    Route::post('/store', 'App\Http\Controllers\BairroDeliveryController@store')->name('bairrosDelivery.store');
+    Route::post('/store', 'BairroDeliveryController@store')->name('bairrosDelivery.underscore.store');
 
     // Rota para exibir o formulário de edição de um bairro
-    Route::get('/{id}/edit', 'App\Http\Controllers\BairroDeliveryController@edit')->name('bairrosDelivery.edit');
+    Route::get('/{id}/edit', 'BairroDeliveryController@edit')->name('bairrosDelivery.underscore.edit');
 
     // Rota para atualizar os dados de um bairro
-    Route::put('/{id}', 'App\Http\Controllers\BairroDeliveryController@update')->name('bairrosDelivery.update');
+    Route::put('/{id}', 'BairroDeliveryController@update')->name('bairrosDelivery.underscore.update');
 
     // Rota para excluir um bairro
-    Route::delete('/{id}', 'App\Http\Controllers\BairroDeliveryController@destroy')->name('bairrosDelivery.destroy');
+    Route::delete('/{id}', 'BairroDeliveryController@destroy')->name('bairrosDelivery.underscore.destroy');
 
     // Rota para exibir as categorias de bairros relacionados a um user_id
-    Route::get('/create/{user_id}', 'App\Http\Controllers\BairroDeliveryController@showCategorias')->name('bairrosDelivery.showCategorias');
+    Route::get('/create/{user_id}', 'BairroDeliveryController@showCategorias')->name('bairrosDelivery.showCategorias');
 
     // Rota para atualizar a disponibilidade de um bairro
-    Route::post('/atualizar-disponibilidade', 'App\Http\Controllers\BairroDeliveryController@atualizarDisponibilidade')->name('bairrosDelivery.atualizarDisponibilidade');
+    Route::post('/atualizar-disponibilidade', 'BairroDeliveryController@atualizarDisponibilidade')->name('bairrosDelivery.atualizarDisponibilidade');
 });
 Route::prefix('configu_delivery')->group(function () {
 
     // Lista empresas com delivery
-    Route::get('/', 'App\Http\Controllers\EmpresadeliveController@index')->name('configu_delivery.index');
+    Route::get('/', 'EmpresadeliveController@index')->name('configu_delivery.index');
 
     // Editar empresa delivery
-    Route::get('/edit/{id}', 'App\Http\Controllers\EmpresadeliveController@edit')->name('configu_delivery.edit');
+    Route::get('/edit/{id}', 'EmpresadeliveController@edit')->name('configu_delivery.edit');
 
     // Atualizar empresa delivery
-    Route::put('/update/{id}', 'App\Http\Controllers\EmpresadeliveController@update')->name('configu_delivery.update');
+    Route::put('/update/{id}', 'EmpresadeliveController@update')->name('configu_delivery.update');
 
     // Salvar nova empresa delivery (caso esteja criando)
-    Route::post('/save', 'App\Http\Controllers\EmpresadeliveController@save')->name('configu_delivery.save');
+    Route::post('/save', 'EmpresadeliveController@save')->name('configu_delivery.save');
 });
 
   Route::group(['prefix' => 'config_horario'], function () {
@@ -672,8 +633,6 @@ Route::prefix('configu_delivery')->group(function () {
         Route::get('/{id}/edit', [AdicionalcondicaoController::class, 'edit'])->name('adicionar_condicao_adicional.edit');
         Route::put('/update/{id}', [AdicionalcondicaoController::class, 'update'])->name('adicionar_condicao_adicional.update');
         Route::delete('/{id}/destroy', [AdicionalcondicaoController::class, 'destroy'])->name('adicionar_condicao_adicional.destroy');
-        Route::delete('/adicionais/delete-multiplos', [AdicionarCondicaoAdicionalController::class, 'destroyMultiple'])->name('adicionar_condicao_adicional.destroy.multiplos');
-
         // Rota AJAX para buscar itens por categoria
         Route::post('/itens-por-categoria', [AdicionalcondicaoController::class, 'getItensPorCategoria'])->name('adicionar_condicao_adicional.getItensPorCategoria');
         // Route::post('/itens-por-categoria', [AdicionalcondicaoController::class, 'listItens'])->name('adicionar_condicao_adicional.listItens');
@@ -689,7 +648,7 @@ Route::prefix('configu_delivery')->group(function () {
         Route::put('/update/{id}', 'AdicionalController@update')->name('add_adicionais_pagos.update');
         Route::delete('/{id}/destroy', 'AdicionalController@destroy')->name('add_adicionais_pagos.destroy');
         Route::post('/add_adicionais_pagos', 'AdicionalController@getItensPorCategoria')->name('add_adicionais_pagos.getItensPorCategoria');
-        Route::post('/atualizar-disponibilidade', 'App\Http\Controllers\AdicionalController@atualizarDisponibilidade')->name('adicionalpago.atualizar-disponibilidade');
+        Route::post('/atualizar-disponibilidade', 'AdicionalController@atualizarDisponibilidade')->name('adicionalpago.atualizar-disponibilidade');
     });
     
      Route::group(['prefix' => 'recorrencia'], function () {
@@ -707,7 +666,7 @@ Route::prefix('configu_delivery')->group(function () {
         Route::put('/update/{id}', 'AdicionalgratisController@update')->name('add_adicionais_gratis.update');
         Route::delete('/{id}/destroy', 'AdicionalgratisController@destroy')->name('add_adicionais_gratis.destroy');
         Route::post('/add_adicionais_gratis', 'AdicionalgratisController@getItensPorCategoria')->name('add_adicionais_gratis.getItensPorCategoria');
-        Route::post('/atualizar-disponibilidade', 'App\Http\Controllers\AdicionalgratisController@atualizarDisponibilidade')->name('adicional.atualizar-disponibilidade');
+        Route::post('/atualizar-disponibilidade', 'AdicionalgratisController@atualizarDisponibilidade')->name('adicional.atualizar-disponibilidade');
     });
 
 
@@ -730,31 +689,13 @@ Route::group(['prefix' => 'cupom'], function () {
 
 
 Route::group(['prefix' => 'wscat'], function () {
-    Route::get('/', 'App\Http\Controllers\WscatetoriaController@index')->name('wscat.index');
-    Route::get('/create', 'App\Http\Controllers\WscatetoriaController@create')->name('wscat.create');
-    Route::post('/store', 'App\Http\Controllers\WscatetoriaController@store')->name('wscat.store');
-        Route::get('/{id}/edit', 'App\Http\Controllers\WscatetoriaController@edit')->name('wscat.edit');
-    Route::put('/update/{id}', 'App\Http\Controllers\WscatetoriaController@update')->name('wscat.update');
-    Route::delete('/destroy/{id}', 'App\Http\Controllers\WscatetoriaController@destroy')->name('wscat.destroy');
+    Route::get('/', 'WscatetoriaController@index')->name('wscat.index');
+    Route::get('/create', 'WscatetoriaController@create')->name('wscat.create');
+    Route::post('/store', 'WscatetoriaController@store')->name('wscat.store');
+        Route::get('/{id}/edit', 'WscatetoriaController@edit')->name('wscat.edit');
+    Route::put('/update/{id}', 'WscatetoriaController@update')->name('wscat.update');
+    Route::delete('/destroy/{id}', 'WscatetoriaController@destroy')->name('wscat.destroy');
 });
-
-Route::group(['prefix' => 'wscat'], function () {
-    Route::get('/', 'App\Http\Controllers\WscatetoriaController@index')->name('wscat.index');
-    Route::get('/create', 'App\Http\Controllers\WscatetoriaController@create')->name('wscat.create');
-    Route::post('/store', 'App\Http\Controllers\WscatetoriaController@store')->name('wscat.store');
-        Route::get('/{id}/edit', 'App\Http\Controllers\WscatetoriaController@edit')->name('wscat.edit');
-    Route::put('/update/{id}', 'App\Http\Controllers\WscatetoriaController@update')->name('wscat.update');
-    Route::delete('/destroy/{id}', 'App\Http\Controllers\WscatetoriaController@destroy')->name('wscat.destroy');
-});
-
-    Route::group(['prefix' => 'remessasBoleto'], function () {
-        Route::get('/', 'RemessaController@index');
-        Route::get('/boletosSemRemessa', 'RemessaController@boletosSemRemessa');
-        Route::get('/gerarRemessaMulti/{boletos}', 'RemessaController@gerarRemessaMulti');
-        Route::get('/ver/{id}', 'RemessaController@ver');
-        Route::get('/delete/{id}', 'RemessaController@delete');
-        Route::get('/download/{id}', 'RemessaController@download');
-    });
 
     Route::group(['prefix' => '/financeiro'], function () {
       Route::get('/', 'FinanceiroController@index');
@@ -951,15 +892,6 @@ Route::group(['prefix' => 'dispositivos'], function () {
 
     Route::resource('dre', 'DreController');
 
-    Route::get('/rotaEntrega/{id}', 'DeliveryController@rotaEntrega');
-
-    Route::group(['prefix' => '/pagseguro'], function () {
-        Route::get('/getSessao', 'PagSeguroController@getSessao');
-        Route::post('/efetuaPagamento', 'PagSeguroController@efetuaPagamento');
-        Route::get('/consultaJS', 'PagSeguroController@consultaJS');
-        Route::get('/getFuncionamento', 'PagSeguroController@getFuncionamento');
-    });
-
     Route::group(['prefix' => '/agendamentos'], function () {
         //     Route::get('/', 'AgendamentoController@index');
         //     Route::get('/all', 'AgendamentoController@all');
@@ -1097,17 +1029,12 @@ Route::get('/vendas-geral-view', 'RelatorioController@relatorioVendasGeralView')
     });
 
 
-    Route::group(['prefix' => '/configMercado'], function () {
-        Route::get('/', 'MercadoConfigController@index');
-        Route::post('/save', 'MercadoConfigController@save');
-    });
-
     Route::resource('categoriaDeLoja', 'CategoriaLojaController');
     Route::resource('categoriaDelivery', 'CategoriaProdutoDeliveryController');
     Route::resource('deliveryComplemento', 'DeliveryComplementoController');
 
     Route::group(['prefix' => 'produtoDelivery'], function () {
-            Route::get('/', 'DeliveryConfigProdutoController@index');
+        Route::get('/', 'ProdutoDeliveryController@index');
         //     Route::get('/delete/{id}', 'DeliveryConfigProdutoController@delete');
         Route::get('/deleteImagem/{id}', 'ProdutoDeliveryController@deleteImagem');
         //     Route::get('/edit/{id}', 'DeliveryConfigProdutoController@edit');
@@ -1242,13 +1169,8 @@ Route::prefix('contasPagar')->group(function () {
 });
 
 
-   // Rota resource para a ContaReceberController
-Route::resource('conta-receber', 'ContaReceberController');
-
 Route::group(['prefix' => 'contasReceber'], function () {
     Route::get('/recorrencias/{id}', 'ContaReceberController@getRecorrencia')->name('conta-receber.recorrencias');
-    Route::get('/{id}/pay', 'ContaReceberController@pay')->name('conta-receber.pay');
-    Route::put('/{id}/payPut', 'ContaReceberController@payPut')->name('conta-receber.payPut');
     Route::post('/enviar-whatsapp', 'ContaReceberController@enviarWhatsApp')->name('conta-receber.enviarWhatsApp');
     Route::get('/{id}/pix', 'MercadoPagoController@gerarPixContaReceber')->name('conta-receber.gerarPix');
     
@@ -1257,12 +1179,6 @@ Route::group(['prefix' => 'contasReceber'], function () {
 });
 
 
-    Route::group(['prefix' => 'receita'], function () {
-        Route::post('/save', 'ReceitaController@save');
-        Route::post('/update', 'ReceitaController@update');
-        Route::post('/saveItem', 'ReceitaController@saveItem');
-        Route::get('/deleteItem/{id}', 'ReceitaController@deleteItem');
-        });
         Route::resource('vendasEmCredito', 'CreditoVendaController');
         Route::resource('funcionamentoDelivery', 'FuncionamentoDeliveryController');
         Route::group(['prefix' => 'funcionamentoDelivery'], function () {
@@ -1289,9 +1205,7 @@ Route::group(['prefix' => 'contasReceber'], function () {
         });
 
         Route::resource('caixa', 'AberturaCaixaController');
-        Route::get('/app', 'PedidoRestController@apk');
         Route::group(['prefix' => 'contasReceber'], function () {
-        Route::get('/{id}/pay', 'ContaReceberController@pay')->name('conta-receber.pay');
         Route::post('/receberSomente', 'ContaReceberController@receberSomente');
         Route::post('/receberComDivergencia', 'ContaReceberController@receberComDivergencia');
         Route::post('/receberComOutros', 'ContaReceberController@receberComOutros');
@@ -1303,14 +1217,6 @@ Route::group(['prefix' => 'contasReceber'], function () {
         Route::get('/filtroPendente', 'ContaReceberController@filtroPendente');
         Route::get('/receberMultiplos/{ids}', 'ContaReceberController@receberMultiplos');
         Route::post('/receberMulti', 'ContaReceberController@receberMulti');
-    });
-
-    Route::group(['prefix' => 'vendasCaixa'], function () {
-        Route::post('/save', 'VendaCaixaController@save');
-        Route::get('/diaria', 'VendaCaixaController@diaria');
-        Route::get('/calcComissao', 'VendaCaixaController@calcComissao');
-        Route::get('/pix', 'VendaCaixaController@gerarQrCode');
-        Route::get('/consultaPix/{id}', 'VendaCaixaController@consultaPix');
     });
 
    Route::group(['prefix' => 'funcionamentoDelivery'], function () {
@@ -1349,7 +1255,6 @@ Route::group(['prefix' => 'contasReceber'], function () {
     Route::group(['prefix' => 'cte'], function () {
         Route::get('/custos/{id}', 'CteController@custos')->name('cte.custos');
         Route::get('/manifesto', 'CteController@manifesto')->name('cte.manifesto');
-        Route::get('/consultaDocumentos', 'EmiteCteController@consultaDocumentos')->name('cte.consultaDocumentos');
         Route::post('/storeReceita', 'CteController@storeReceita')->name('cte.storeReceita');
         Route::post('/storeDespesa/{id}', 'CteController@storeDespesa')->name('cte.storeDespesa');
         Route::get('/deleteDespesa/{id}', 'CteController@deleteDespesa')->name('cte.deleteDespesa');
@@ -1518,7 +1423,7 @@ Route::resource('funcionarios', FuncionarioController::class);
         Route::get('/clone/{id}', 'VendaController@clone')->name('vendas.clone');
         Route::get('/details/{id}', 'VendaController@details')->name('vendas.details');
         Route::get('/importacao', 'VendaController@importacao')->name('vendas.importacao');
-        Route::post('/importacao', 'VendaController@importStore')->name('vendas.importacao');
+        Route::post('/importacao', 'VendaController@importStore')->name('vendas.importacao.store');
         Route::get('/print/{id}', 'VendaController@print')->name('vendas.print');
         Route::get('/xml-temp/{id}', 'VendaController@xmlTemp')->name('vendas.xml-temp');
         Route::get('/danfe-temp/{id?}', 'VendaController@danfeTemp')->name('vendas.danfe-temp');
@@ -1683,18 +1588,13 @@ Route::get('/storeApontamentomanual', 'StockController@storeApontamentomanual')
         Route::get('/devolucao', 'FrontBoxController@devolucao')->name('frenteCaixa.devolucao');
         Route::get('/troca', 'FrontBoxController@troca')->name('frenteCaixa.troca');
         Route::get('/fechar', 'FrontBoxController@fecharCaixa')->name('frenteCaixa.fechar');
-        Route::post('/fechar', 'FrontBoxController@fecharPost')->name('frenteCaixa.fecharPost');
         Route::get('/config', 'FrontBoxController@configuracao')->name('frenteCaixa.configuracao');
-        Route::post('/storeConfig', 'FrontBoxController@storeConfig')->name('frenteCaixa.storeConfig');
+        Route::post('/storeConfig', 'FrontBoxController@storeConfig')->name('frenteCaixa.storeConfig.post');
         Route::get('/storeConfig', 'FrontBoxController@storeConfig')->name('frenteCaixa.storeConfig');
     });
 
     Route::resource('frenteCaixa', 'FrontBoxController');
     Route::resource('preVenda', 'PreVendaController');
-
-    Route::group(['prefix' => 'clienteDelivery'], function () {
-        Route::get('/all', 'AppUserController@all');
-    });
 
     Route::resource('push', 'PushController');
 
@@ -1793,8 +1693,6 @@ Route::get('/api/graficos/contasPagar/categoria', [GraficoController::class, 'co
 
     Route::group(['prefix' => 'orcamentoVenda'], function () {
         Route::post('/gerarPagamentos', 'OrcamentoController@gerarPagamentos')->name('orcamentoVenda.gerarPagamentos');
-        Route::resource('orcamentoVenda', 'OrcamentoController')->except(['create']);
-
         Route::get('/destroyParcela/{id}', 'OrcamentoController@destroyParcela')->name('orcamentoVenda.destroyParcela');
         Route::get('/destroyItem/{id}', 'OrcamentoController@destroyItem')->name('orcamentoVenda.destroyItem');
         Route::post('/addPagamentos', 'OrcamentoController@addPagamentos')->name('orcamentoVenda.addPagamentos');
@@ -1911,7 +1809,7 @@ Route::get('pedidosEcommerce/alterarStatus/{id}/{status}/{tipo}', [PedidoEcommer
 
 // DANFE Simulada
 Route::get('pedidosEcommerce/danfe/{id}', [PedidoEcommerceController::class, 'danfeSimulada'])
-    ->name('pedidosEcommerce.danfe');
+    ->name('pedidosEcommerce.danfe.legacy');
 
 // Declaração de Conteúdo
 Route::get('pedidosEcommerce/declaracao/{id}', [PedidoEcommerceController::class, 'declaracaoConteudo'])
@@ -1920,7 +1818,7 @@ Route::get('pedidosEcommerce/declaracao/{id}', [PedidoEcommerceController::class
 // Etiqueta Oficial Correios (API)
 // Esta é a rota que o seu JavaScript do Modal deve chamar
 Route::get('pedidosEcommerce/etiqueta/{id}', [PedidoEcommerceController::class, 'etiqueta'])
-    ->name('pedidosEcommerce.etiqueta');
+    ->name('pedidosEcommerce.etiqueta.legacy');
     
 // --- Marketing e Conteúdo ---
 Route::resource('carrosselEcommerce', 'CarrosselEcommerceController');
