@@ -1435,6 +1435,28 @@ Route::resource('funcionarios', FuncionarioController::class);
     });
 
 
+    // Ações fiscais chamadas pelas telas autenticadas. O tenant é sempre
+    // resolvido pela sessão web; o empresa_id do navegador é ignorado.
+    Route::prefix('fiscal')->group(function () {
+        Route::prefix('nfe')->group(function () {
+            Route::post('/transmitir', 'API\\NFeController@transmitir')->middleware('limiteNFe')->name('fiscal.nfe.transmitir');
+            Route::post('/consultar', 'API\\NFeController@consultarNfe')->name('fiscal.nfe.consultar');
+            Route::post('/cancelar', 'API\\NFeController@cancelar')->name('fiscal.nfe.cancelar');
+            Route::post('/corrigir', 'API\\NFeController@corrigir')->name('fiscal.nfe.corrigir');
+            Route::post('/inutilizar', 'API\\NFeController@inutiliza')->name('fiscal.nfe.inutilizar');
+            Route::post('/status-sefaz', 'API\\NFeController@consultaStatusSefaz')->name('fiscal.nfe.status-sefaz');
+        });
+
+        Route::prefix('nfce')->group(function () {
+            Route::post('/transmitir', 'API\\NFCeController@transmitir')->middleware('limiteNFCe')->name('fiscal.nfce.transmitir');
+            Route::post('/consultar', 'API\\NFCeController@consultar')->name('fiscal.nfce.consultar');
+            Route::post('/cancelar', 'API\\NFCeController@cancelar')->name('fiscal.nfce.cancelar');
+            Route::post('/inutilizar', 'API\\NFCeController@inutilizar')->name('fiscal.nfce.inutilizar');
+            Route::post('/status-sefaz', 'API\\NFCeController@consultaStatusSefaz')->name('fiscal.nfce.status-sefaz');
+        });
+    });
+
+
     Route::group(['prefix' => 'nfe', 'middleware' => 'limiteNFe'], function () {
         Route::get('/imprimir/{id}', 'NfeController@imprimir')->name('nfe.imprimir');
         Route::get('/imprimir-cce/{id}', 'NfeController@imprimirCorrecao')->name('nfe.imprimir-cce');
