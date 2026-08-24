@@ -12,4 +12,9 @@ class ProdutoIbpt extends Model
         'produto_id', 'codigo', 'uf', 'descricao', 'nacional', 'estadual', 'importado',
         'municipal', 'vigencia_inicio', 'vigencia_fim', 'chave', 'versao', 'fonte'
     ];
+
+    public function produto()
+    {
+        return $this->belongsTo(Produto::class, 'produto_id');
+    }
 }
