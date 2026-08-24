@@ -206,12 +206,14 @@ public function gerarNFCe($venda){
 		);
 		$VBC = 0;
 
-		$somaFederal = 0;
-		$somaEstadual = 0;
-		$somaMunicipal = 0;
-		$somaTotTrib = 0;
+		$somaFederalCentavos = 0;
+		$somaEstadualCentavos = 0;
+		$somaMunicipalCentavos = 0;
+		$somaTotTribCentavos = 0;
+		$calculadoraTributos = new NFCeApproximateTaxService();
 
-		$obsIbpt = "";
+		$fontesIbpt = [];
+		$ufIbpt = (new FiscalIssuerUfService())->resolve($config);
 
 		foreach($venda->itens as $i){
 			$itemCont++;
@@ -236,7 +238,7 @@ public function gerarNFCe($venda){
 			$ncm = $i->produto->NCM;
 			$ncm = str_replace(".", "", $ncm);
 			$stdProd->NCM = $ncm;
-			$ibpt = $i->produto->ibpt ?? IBPT::getIBPT($config->UF, $ncm);
+			$ibpt = $i->produto->ibpt ?? IBPT::getIBPT($ufIbpt, $ncm);
 
 			$stdProd->CFOP = $i->produto->CFOP_saida_estadual;
 
@@ -307,7 +309,7 @@ public function gerarNFCe($venda){
 			$stdImposto = new \stdClass();
 			$stdImposto->item = $itemCont;
 
-			$vTotTribItem = 0;
+			$vTotTribItemCentavos = 0;
 
 			if($ibpt != null){
 				$vProd = $stdProd->vProd;
@@ -315,23 +317,26 @@ public function gerarNFCe($venda){
 				$aliqEstadual = $ibpt->estadual ?? 0;
 				$aliqMunicipal = $ibpt->municipal ?? 0;
 
-				$federal = $this->format(($vProd * ($aliqNacional / 100)), 2);
-				$somaFederal += $federal;
+				$tributosItem = $calculadoraTributos->calcularItem(
+					(float) $vProd,
+					(float) $aliqNacional,
+					(float) $aliqEstadual,
+					(float) $aliqMunicipal
+				);
+				$somaFederalCentavos += $tributosItem['federal_centavos'];
+				$somaEstadualCentavos += $tributosItem['estadual_centavos'];
+				$somaMunicipalCentavos += $tributosItem['municipal_centavos'];
+				$vTotTribItemCentavos = $tributosItem['total_centavos'];
+				$somaTotTribCentavos += $vTotTribItemCentavos;
 
-				$estadual = $this->format(($vProd * ($aliqEstadual / 100)), 2);
-				$somaEstadual += $estadual;
-
-				$municipal = $this->format(($vProd * ($aliqMunicipal / 100)), 2);
-				$somaMunicipal += $municipal;
-
-				$vTotTribItem = $federal + $estadual + $municipal;
-				$somaTotTrib += $vTotTribItem;
-
-				$obsIbpt = " FONTE: " . ($ibpt->fonte ?? $ibpt->versao ?? '');
-				$obsIbpt .= " | ";
+				$fonteIbpt = trim((string) ($ibpt->fonte ?? $ibpt->versao ?? ''));
+				if($fonteIbpt !== ''){
+					$fontesIbpt[] = $fonteIbpt;
+				}
 			}
 
-			$imposto = $nfe->tagimposto($stdImposto, $this->format($vTotTribItem));
+			$stdImposto->vTotTrib = $calculadoraTributos->formatarCentavos($vTotTribItemCentavos);
+			$imposto = $nfe->tagimposto($stdImposto);
 
 			if($tributacao->regime == 1){ // regime normal
 				$stdICMS = new \stdClass();
@@ -441,7 +446,7 @@ public function gerarNFCe($venda){
 		$stdICMSTot->vCOFINS = $this->format($somaCOFINS);
 		$stdICMSTot->vOutro = $this->format($venda->acrescimo);
 		$stdICMSTot->vNF = $this->format($venda->valor_total);
-		$stdICMSTot->vTotTrib = $this->format($somaTotTrib);
+		$stdICMSTot->vTotTrib = $calculadoraTributos->formatarCentavos($somaTotTribCentavos);
 
 		$stdICMSTot->vIBS = $this->format($somaIBS);
 		$stdICMSTot->vCBS = $this->format($somaCBS);
@@ -527,29 +532,20 @@ public function gerarNFCe($venda){
 			}
 		}
 
-		// INFORMAÇÃO ADICIONAL COM OS IMPOSTOS EXIBIDOS EXPLÍCITOS PARA O CLIENTE
+		// INFORMAÇÃO ADICIONAL EXIBIDA NO BLOCO DE TRIBUTOS DO DANFC-e.
 		$stdInfoAdic = new \stdClass();
-		$obs = "Valores aproximados de impostos pagos: ";
-		
-		$impostosDet = [];
-		if($somaFederal > 0) $impostosDet[] = "Federal: R$ " . number_format($somaFederal, 2, ',', '.');
-		if($somaEstadual > 0) $impostosDet[] = "Estadual: R$ " . number_format($somaEstadual, 2, ',', '.');
-		if($somaMunicipal > 0) $impostosDet[] = "Municipal: R$ " . number_format($somaMunicipal, 2, ',', '.');
-		if($somaICMS > 0) $impostosDet[] = "ICMS: R$ " . number_format($somaICMS, 2, ',', '.');
-		if($somaPIS > 0) $impostosDet[] = "PIS: R$ " . number_format($somaPIS, 2, ',', '.');
-		if($somaCOFINS > 0) $impostosDet[] = "COFINS: R$ " . number_format($somaCOFINS, 2, ',', '.');
-		if($somaIBS > 0) $impostosDet[] = "IBS: R$ " . number_format($somaIBS, 2, ',', '.');
-		if($somaCBS > 0) $impostosDet[] = "CBS: R$ " . number_format($somaCBS, 2, ',', '.');
-
-		if(count($impostosDet) > 0){
-			$obs .= implode(" | ", $impostosDet);
-		} else {
-			$obs .= "Nenhum imposto discriminado para esta venda.";
-		}
-		
-		$obs .= $obsIbpt;
-
-		$stdInfoAdic->infCpl = $obs;
+		$stdInfoAdic->infCpl = (new NFCeTaxReceiptTextService())->formatar([
+			'federal' => $somaFederalCentavos / 100,
+			'estadual' => $somaEstadualCentavos / 100,
+			'municipal' => $somaMunicipalCentavos / 100,
+			'total' => $somaTotTribCentavos / 100,
+			'icms' => $somaICMS,
+			'pis' => $somaPIS,
+			'cofins' => $somaCOFINS,
+			'ibs' => $somaIBS,
+			'cbs' => $somaCBS,
+			'is' => $somaIS,
+		], $fontesIbpt);
 		$infoAdic = $nfe->taginfAdic($stdInfoAdic);
 
 		try{

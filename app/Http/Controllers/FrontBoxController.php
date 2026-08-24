@@ -36,10 +36,11 @@ use App\Models\VendaCaixa;
 use App\Models\VendaCaixaPreVenda;
 use App\Services\AutorizacaoDevolucaoService;
 use App\Services\DevolucaoEstoqueService;
+use App\Services\FiscalTenantGuardService;
+use App\Services\PdvReceiptPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use NFePHP\DA\NFe\Cupom;
-use NFePHP\DA\NFe\CupomNaoFiscal;
 use NFePHP\DA\NFe\CupomPedido;
 use Svg\Tag\Rect;
 use App\Models\Contigencia;
@@ -74,6 +75,68 @@ class FrontBoxController extends Controller
     {   
         $view = $this->pdvAssincrono($request->prevenda_id);
         return $view;
+    }
+
+    /**
+     * As consultas de produto feitas pela tela web do PDV usam a empresa da
+     * sessão, resolvida pelo ResolveCashTenantContext. O controller da API é
+     * reutilizado apenas para manter o mesmo formato de resposta das telas
+     * legadas; empresa_id recebido do navegador nunca é a fonte de identidade.
+     */
+    public function produtosPesquisa(Request $request)
+    {
+        return app(\App\Http\Controllers\API\ProdutoController::class)
+            ->pesquisa($request);
+    }
+
+    public function produtosFind(Request $request, $id)
+    {
+        app(FiscalTenantGuardService::class)->produto(
+            (int) $request->empresa_id,
+            (int) $id
+        );
+
+        return app(\App\Http\Controllers\API\ProdutoController::class)
+            ->find(
+                $id,
+                $request,
+                app(\App\Services\PdvListaPrecoService::class)
+            );
+    }
+
+    public function produtosFindByBarcode(Request $request)
+    {
+        return app(\App\Http\Controllers\API\ProdutoController::class)
+            ->findByBarcode(
+                $request,
+                app(\App\Services\PdvListaPrecoService::class)
+            );
+    }
+
+    public function produtosFindByBarcodeReference(Request $request)
+    {
+        return app(\App\Http\Controllers\API\ProdutoController::class)
+            ->findByBarcodeReference($request);
+    }
+
+    /**
+     * A emissão iniciada pelo PDV web usa a empresa autenticada na sessão.
+     * O ResolveCashTenantContext substitui qualquer empresa_id enviado pelo
+     * navegador antes de a venda e a configuração fiscal serem consultadas.
+     */
+    public function transmitirNfce(Request $request)
+    {
+        $dados = $request->validate([
+            'id' => 'required|integer',
+        ]);
+
+        app(FiscalTenantGuardService::class)->vendaCaixa(
+            (int) $request->empresa_id,
+            (int) $dados['id']
+        );
+
+        return app(\App\Http\Controllers\API\NFCeController::class)
+            ->transmitir($request);
     }
 
     private function validaCaixaAberto($funcionarios)
@@ -941,24 +1004,24 @@ private function getContigencia()
     return $active;
 }
 
-public function imprimirNaoFiscal($id)
+public function imprimirNaoFiscal($id, PdvReceiptPdfService $receiptService)
 {
     $item = VendaCaixa::findOrFail($id);
     if (valida_objeto($item)) {
         $config = ConfigNota::where('empresa_id', $item->empresa_id)
         ->first();
         if ($config->logo) {
-            $logo = 'data://text/plain;base64,' . base64_encode(file_get_contents(public_path('uploads/configEmitente/') . $config->logo));   
+            $logoPath = public_path('uploads/configEmitente/') . $config->logo;
+            $logoMime = mime_content_type($logoPath) ?: 'image/jpeg';
+            $logo = 'data:' . $logoMime . ';base64,' . base64_encode(file_get_contents($logoPath));
         } else {
             $logo = null;
         }
         $usuario = Usuario::find(get_id_user());
-        $cupom = new CupomNaoFiscal($item, $config);
-
-        if ($usuario->config) {
-            $cupom->setPaperWidth($usuario->config->impressora_modelo);
-        }
-        $pdf = $cupom->render($logo);
+        $paperWidth = $usuario->config
+            ? (int) $usuario->config->impressora_modelo
+            : 80;
+        $pdf = $receiptService->render($item, $config, $logo, $paperWidth);
         return response($pdf)
         ->header('Content-Type', 'application/pdf');
     } else {

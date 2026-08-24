@@ -204,7 +204,20 @@
     </div>
 
     <div class="col-md-4 mt-3">
-        {!! Form::tel('csc', 'CSC')->attrs(['class' => ''])->required() !!}
+        <label for="csc" class="form-label">CSC</label>
+        <input
+            type="password"
+            id="csc"
+            name="csc"
+            class="form-control"
+            value="{{ old('csc') }}"
+            autocomplete="new-password"
+            placeholder="{{ $cscCadastrado ? 'CSC já cadastrado — digite somente para substituir' : 'Informe o CSC' }}"
+            @if (!$cscCadastrado) required @endif
+        >
+        @if ($cscCadastrado)
+            <small class="text-success">CSC cadastrado. O valor não é exibido por segurança.</small>
+        @endif
     </div>
 
     <div class="col-md-3 mt-3">

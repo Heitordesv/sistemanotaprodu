@@ -84,6 +84,8 @@ class ConfigNotaController extends Controller
             $infoCertificado = $this->getInfoCertificado($item);
         }
 
+        $cscCadastrado = $item !== null && !empty($item->getRawOriginal('csc'));
+
         $this->maskSecretsForForm($item);
         $this->maskSecretsForForm($config);
 
@@ -104,6 +106,7 @@ class ConfigNotaController extends Controller
                 'listaCSTIPI',
                 'cUF',
                 'cidades',
+                'cscCadastrado',
                 'item'
             )
         );
@@ -143,6 +146,7 @@ class ConfigNotaController extends Controller
         try {
             $item = ConfigNota::where('empresa_id', $request->empresa_id)->first();
             $logo = $item->logo ?? null;
+            $cidade = Cidade::findOrFail($request->cidade_id);
 
             if ($request->hasFile('image')) {
                 if ($item && $item->logo) {
@@ -164,21 +168,44 @@ class ConfigNotaController extends Controller
                 'cep' => $request->cep ?? '',
                 'complemento' => $request->complemento ?? '',
                 'cidade_id' => $request->cidade_id ?? '',
-                'pais' => $request->pais ?? '',
-                'cUF' => $request->cUF ?? '',
+                'pais' => $request->pais ?? ($item->pais ?? 'Brasil'),
+                'cUF' => $request->cUF ?? ($item->cUF ?? ConfigNota::getCodUF($cidade->uf)),
                 'fone' => $request->fone ?? '',
                 'email' => $request->email ?? '',
-                'campo_obs_pedido' => $request->campo_obs_pedido ?? '',
-                'campo_obs_nfe' => $request->campo_obs_nfe ?? '',
+                'CST_CSOSN_padrao' => $request->CST_CSOSN_padrao ?? ($item->CST_CSOSN_padrao ?? '102'),
+                'CST_COFINS_padrao' => $request->CST_COFINS_padrao ?? ($item->CST_COFINS_padrao ?? '01'),
+                'CST_PIS_padrao' => $request->CST_PIS_padrao ?? ($item->CST_PIS_padrao ?? '01'),
+                'CST_IPI_padrao' => $request->CST_IPI_padrao ?? ($item->CST_IPI_padrao ?? '50'),
+                'frete_padrao' => $request->frete_padrao ?? ($item->frete_padrao ?? 9),
+                'tipo_pagamento_padrao' => $request->tipo_pagamento_padrao ?? ($item->tipo_pagamento_padrao ?? '01'),
+                'ambiente' => (int) $request->ambiente,
+                'numero_serie_nfe' => $request->numero_serie_nfe,
+                'numero_serie_nfce' => $request->numero_serie_nfce,
+                'numero_serie_cte' => $request->numero_serie_cte,
+                'numero_serie_mdfe' => $item->numero_serie_mdfe ?? '1',
+                'ultimo_numero_nfe' => (int) $request->ultimo_numero_nfe,
+                'ultimo_numero_nfce' => (int) $request->ultimo_numero_nfce,
+                'ultimo_numero_cte' => (int) $request->ultimo_numero_cte,
+                'ultimo_numero_mdfe' => (int) ($item->ultimo_numero_mdfe ?? 0),
+                'campo_obs_pedido' => $request->campo_obs_pedido ?? ($item->campo_obs_pedido ?? ''),
+                'campo_obs_nfe' => $request->observacao_nfe ?? $request->campo_obs_nfe ?? ($item->campo_obs_nfe ?? ''),
                 'certificado_a3' => $request->certificado_a3 ?? 0,
                 'inscricao_municipal' => $request->inscricao_municipal ?? '',
+                'aut_xml' => $request->auto_xml ?? $request->aut_xml ?? ($item->aut_xml ?? ''),
                 'token_ibpt' => $request->filled('token_ibpt') ? $request->token_ibpt : ($item->token_ibpt ?? ''),
+                'token_nfse' => $request->filled('token_nfse') ? $request->token_nfse : ($item->token_nfse ?? ''),
                 'percentual_lucro_padrao' => $request->percentual_lucro_padrao ?? 0,
+                'percentual_max_desconto' => $request->parcentual_max_desconto ?? $request->percentual_max_desconto ?? ($item->percentual_max_desconto ?? 0),
                 'validade_orcamento' => $request->validade_orcamento ?? 0,
                 'casas_decimais' => $request->casas_decimais ?? 2,
                 'nat_op_padrao' => $request->nat_op_padrao ?? '',
                 'parcelamento_maximo' => $request->parcelamento_maximo ?? 12,
                 'sobrescrita_csonn_consumidor_final' => $request->sobrescrita_csonn_consumidor_final ?? '',
+                'caixa_por_usuario' => $request->caixa_por_usuario ?? ($item->caixa_por_usuario ?? 0),
+                'codigo_tributacao_municipio' => $request->codigo_tributacao_municipio ?? ($item->codigo_tributacao_municipio ?? ''),
+                'usar_email_proprio' => $request->usar_email_proprio ?? ($item->usar_email_proprio ?? 0),
+                'cProdTipo' => $request->cProdTipo ?? ($item->cProdTipo ?? 0),
+                'graficos_dash' => $item->graficos_dash ?? '[]',
                 'senha_remover' => $request->senha_remover ? md5($request->senha_remover) : ($item->senha_remover ?? ''),
                 'background_color' => $request->background_color ?? ($item->background_color ?? '#343a40'),
                 'text_color' => $request->text_color ?? ($item->text_color ?? '#ffffff'),
