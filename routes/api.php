@@ -8,10 +8,6 @@ use App\Http\Controllers\InterPixController;
 use App\Http\Controllers\API\VendaCaixaController;
 use App\Http\Controllers\VendaPixController;
 
-use App\Http\Controllers\BlingController;
-
-
-
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -29,12 +25,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 
 Route::get('graficos/curvaABC', [GraficoController::class, 'curvaABC']);
-
-Route::prefix('bling')->group(function() {
-    Route::get('token/{empresa_id}', [BlingController::class, 'getToken']);
-    Route::post('token/save', [BlingController::class, 'saveToken']);
-    Route::get('token/refresh/{empresa_id}', [BlingController::class, 'refreshToken']);
-});
 
 Route::post('/webhook/whatsapp-status', [WebhookController::class, 'handle']);
 Route::get('/interpix/token', [InterPixController::class, 'autenticar']);

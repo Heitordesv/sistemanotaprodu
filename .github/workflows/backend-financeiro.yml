@@ -72,6 +72,11 @@ jobs:
       - name: Clear Laravel config
         run: php artisan config:clear
 
+      - name: Route registry and tenant session tests
+        run: |
+          vendor/bin/phpunit tests/Feature/RouteRegistryIntegrityTest.php
+          vendor/bin/phpunit tests/Feature/OsDashboardTenantSessionTest.php
+
       - name: Fiscal tenant isolation tests
         run: |
           vendor/bin/phpunit tests/Feature/FiscalTenantGuardTest.php
