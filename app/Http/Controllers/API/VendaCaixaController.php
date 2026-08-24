@@ -18,6 +18,7 @@ use App\Models\Produto;
 use App\Models\VendaCaixa;
 use App\Models\VendaCaixaPreVenda;
 use App\Services\LimiteCreditoClienteService;
+use App\Services\PdvListaPrecoService;
 use App\Services\PdvTotalService;
 use Carbon\Carbon;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -36,7 +37,8 @@ class VendaCaixaController extends Controller
     public function store(
         Request $request,
         LimiteCreditoClienteService $creditoService,
-        PdvTotalService $totalService
+        PdvTotalService $totalService,
+        PdvListaPrecoService $listaPrecoService
     )
     {
         $empresaId = (int) $request->empresa_id;
@@ -64,6 +66,7 @@ class VendaCaixaController extends Controller
                 'desconto_valor' => 'nullable',
                 'acrescimo_valor' => 'nullable',
                 'taxa_entrega' => 'nullable',
+                'lista_preco_id' => 'nullable|integer',
             ]);
 
             $empresaId = (int) $request->empresa_id;
@@ -101,8 +104,14 @@ class VendaCaixaController extends Controller
                 $request,
                 $creditoService,
                 $totalService,
+                $listaPrecoService,
                 $empresa
             ) {
+                $this->normalizarPrecosDaLista(
+                    $request,
+                    (int) $empresa->id,
+                    $listaPrecoService
+                );
                 $valorItens = $this->somaItens($request, (int) $empresa->id);
                 $ajustes = $totalService->calcular(
                     $valorItens,
@@ -294,6 +303,46 @@ class VendaCaixaController extends Controller
         $convertido = @iconv('Windows-1252', 'UTF-8//IGNORE', $valor);
 
         return $convertido === false ? '' : $convertido;
+    }
+
+    private function normalizarPrecosDaLista(
+        Request $request,
+        int $empresaId,
+        PdvListaPrecoService $listaPrecoService
+    ): void {
+        $listaPrecoId = $request->filled('lista_preco_id')
+            ? (int) $request->lista_preco_id
+            : null;
+
+        $listaPrecoService->resolverLista($listaPrecoId, $empresaId);
+        $request->merge(['lista_preco_id' => $listaPrecoId]);
+
+        if (!$listaPrecoId) {
+            return;
+        }
+
+        $produtos = Arr::wrap($request->produto_id);
+        $valoresNormalizados = [];
+
+        foreach ($produtos as $produtoId) {
+            $produto = Produto::with('categoria')
+                ->where('id', (int) $produtoId)
+                ->where('empresa_id', $empresaId)
+                ->firstOrFail();
+
+            $valoresNormalizados[] = number_format(
+                $listaPrecoService->precoPdv(
+                    $produto,
+                    $listaPrecoId,
+                    $empresaId
+                ),
+                2,
+                '.',
+                ''
+            );
+        }
+
+        $request->merge(['valor_unitario' => $valoresNormalizados]);
     }
 
     private function somaItens(Request $request, int $empresaId): float
