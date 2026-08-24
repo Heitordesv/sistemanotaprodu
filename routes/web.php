@@ -955,13 +955,18 @@ Route::group(['prefix' => 'Marketing'], function () {
     Route::group(['prefix' => '/dfe'], function () {
         Route::get('/novaConsulta', 'DfeController@novaconsulta')->name('dfe.novaConsulta');
         Route::get('/getDocumentosNovos', 'DfeController@getDocumentosNovos')->name('dfe.getDocumentosNovos');
+        Route::post('/produtos/store', 'API\ProdutoController@store')
+            ->middleware('limiteProdutos')
+            ->name('dfe.produtos.store');
+        Route::get('/subcategorias', 'API\CategoriaController@buscarSubCategoria')
+            ->name('dfe.subcategorias.index');
         Route::post('/manifestar', 'DfeController@manifestar')->name('dfe.manifestar');
         Route::get('/danfe/{id}', 'DfeController@danfe')->name('dfe.danfe');
         Route::get('/download/{id}', 'DfeController@download')->name('dfe.download');
         Route::post('/storeFatura', 'DfeController@storeFatura')->name('dfe.storeFatura');
         Route::post('/storeCompra', 'DfeController@storeCompra')->name('dfe.storeCompra');
         Route::get('/downloadXml/{chave}', 'DfeController@downloadXml')->name('dfe.downloadXml');
-        Route::get('/devolucao/{chave}', 'DfeController@devolucao')->name('dfe.devolucao');
+        Route::get('/devolucao/{id}', 'DfeController@devolucao')->name('dfe.devolucao');
     });
 
     Route::resource('dfe', 'DfeController');

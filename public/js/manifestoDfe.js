@@ -10,7 +10,6 @@ function selectDiv(ref) {
         $('.btn-identificacao').addClass('link-active')
     }
 }
-
 $(function(){
     verificaProdutoSemRegistro()
 })
@@ -39,7 +38,7 @@ $(".modal .select2").each(function () {
             theme: "bootstrap4",
             ajax: {
                 cache: true,
-                url: path_url + "api/categorias/buscarSubCategoria",
+                url: window.dfeEndpoints && window.dfeEndpoints.subcategorias,
                 dataType: "json",
                 data: function (params) {
                     console.clear();
@@ -155,9 +154,13 @@ $('#btn-store-produto').click(() => {
             }
         });
 
-        data['empresa_id'] = $('#empresa_id').val()
+        const endpoint = window.dfeEndpoints && window.dfeEndpoints.salvarProduto;
+        if (!endpoint) {
+            swal("Erro", "A rota de cadastro de produto não foi configurada.", "error");
+            return;
+        }
 
-        $.post(path_url + 'api/produtos/store', data)
+        $.post(endpoint, data)
             .done((success) => {
                 console.log("success", success)
                 swal("Sucesso", "Produto cadastrado!", "success")
@@ -194,22 +197,4 @@ function verificaProdutoSemRegistro() {
             $('#btn-salvar').removeAttr('disabled')
         }
     }, 50)
-}
-
-
-function contaPagar(vencimento, valor_fatura, fornecedor) {
-    let pagar = {
-        vencimento: vencimento,
-        valor_fatura: valor_fatura,
-        fornecedor: fornecedor
-    }
-    console.log(pagar)
-    $.post(path_url + 'api/conta-pagar/faturaManifesto', pagar)
-        .done((success) => {
-            console.log("success", success)
-            swal("Sucesso", "Fatura adicionada", "success")
-        }).fail((err) => {
-            console.log(err)
-            swal("Ops", "Algo deu errado ao salvar!", "error")
-        })
 }

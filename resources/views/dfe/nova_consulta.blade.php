@@ -9,7 +9,7 @@
                 
                 <p id="aguarde" class="text-info d-none">
                     <a id="btn-enviar" class="btn btn-success spinner-white spinner spinner-right">
-                        Consultado novos documentos, aguarde ...
+                        Consultando novos documentos, aguarde...
                     </a>
                 </p>
                 <p id="sem-resultado" style="display: none" class="center-align text-danger">Nenhum novo resultado...</p>
@@ -39,7 +39,12 @@
 </div>
 
 @section('js')
-<script type="text/javascript" src="/js/dfe.js?v=1"></script>
+<script>
+window.dfeEndpoints = {
+    novosDocumentos: @json(route('dfe.getDocumentosNovos'))
+};
+</script>
+<script type="text/javascript" src="{{ asset('js/dfe.js') }}?v={{ filemtime(public_path('js/dfe.js')) }}"></script>
 
 @endsection
 @endsection

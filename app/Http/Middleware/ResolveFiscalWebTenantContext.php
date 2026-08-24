@@ -3,9 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\Http\Controllers\ConfigNotaController;
+use App\Http\Controllers\DfeController;
 use App\Http\Controllers\NaturezaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\API\GraficoController;
+use App\Http\Controllers\API\CategoriaController as ApiCategoriaController;
 use App\Http\Controllers\API\NFCeController as ApiNFCeController;
 use App\Http\Controllers\API\NFeController as ApiNFeController;
 use App\Http\Controllers\API\ProdutoController as ApiProdutoController;
@@ -19,6 +21,8 @@ class ResolveFiscalWebTenantContext
         ProductController::class,
         NaturezaController::class,
         ConfigNotaController::class,
+        DfeController::class,
+        ApiCategoriaController::class,
         ApiProdutoController::class,
         ApiNFeController::class,
         ApiNFCeController::class,

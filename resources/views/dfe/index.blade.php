@@ -41,7 +41,7 @@
                 {!!Form::close()!!}
 
                 <div class="mt-4">
-                    <a href="{{ route('dfe.novaConsulta') }}" ype="button" class="btn btn-primary"><i class="bx bx-refresh"></i> Nova consulta de documentos</a>
+                    <a href="{{ route('dfe.novaConsulta') }}" type="button" class="btn btn-primary"><i class="bx bx-refresh"></i> Nova consulta de documentos</a>
                 </div>
                 <p class="mt-3">Total de registros: {{$data->total()}}</p>
                 <hr />
@@ -78,12 +78,12 @@
 
                                             <a target="_blank" href="{{ route('dfe.danfe', [$item->id]) }}" class="btn btn-primary">Imprimir</a>
                                           
-                                            <a href="/dfe/downloadXml/{{$item->chave}}" type="submit" class="btn btn-warning">
+                                            <a href="{{ route('dfe.downloadXml', $item->chave) }}" class="btn btn-warning">
                                                 Baixar XML
                                             </a>
 
 
-                                            @elseif($item->tipo == 1 || $item->tipo == 2)
+                                            @elseif($item->tipo == 3)
                                             <a class="btn btn-danger">Desconhecida</a>
                                             @elseif($item->tipo == 4)
                                             <a class="btn btn-warning">Não realizada</a>
@@ -107,7 +107,7 @@
                 {!! $data->appends(request()->all())->links() !!}
 <div class="mt-3 text-right">
     <strong>Total:</strong> 
-    {{ __moeda($data->sum('valor')) }}
+    {{ __moeda($totalValor) }}
 </div>
             </div>
         </div>

@@ -42,9 +42,16 @@ class CategoriaController extends Controller
     }
 
     public function buscarSubCategoria(Request $request){
+		$request->validate([
+			'categoria_id' => 'required|integer',
+			'pesquisa' => 'nullable|string|max:100',
+		]);
         $data = SubCategoria::
         where('nome', 'like', "%$request->pesquisa%")
         ->where('categoria_id', $request->categoria_id)
+		->whereHas('categoria', function ($query) use ($request) {
+			$query->where('empresa_id', $request->empresa_id);
+		})
         ->get();
 
         return response()->json($data, 200);
