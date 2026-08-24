@@ -563,22 +563,22 @@ Route::group(['prefix' => 'itens'], function () {
 
 Route::group(['prefix' => 'bairros_delivery'], function () {
     // Rota para exibir os bairros com filtros e paginação
-    Route::get('/', 'BairroDeliveryController@index')->name('bairrosDelivery.index');
+    Route::get('/', 'BairroDeliveryController@index')->name('bairrosDelivery.underscore.index');
 
     // Rota para exibir o formulário de criação de um novo bairro
-    Route::get('/create', 'BairroDeliveryController@create')->name('bairrosDelivery.create');
+    Route::get('/create', 'BairroDeliveryController@create')->name('bairrosDelivery.underscore.create');
 
     // Rota para salvar um novo bairro
-    Route::post('/store', 'BairroDeliveryController@store')->name('bairrosDelivery.store');
+    Route::post('/store', 'BairroDeliveryController@store')->name('bairrosDelivery.underscore.store');
 
     // Rota para exibir o formulário de edição de um bairro
-    Route::get('/{id}/edit', 'BairroDeliveryController@edit')->name('bairrosDelivery.edit');
+    Route::get('/{id}/edit', 'BairroDeliveryController@edit')->name('bairrosDelivery.underscore.edit');
 
     // Rota para atualizar os dados de um bairro
-    Route::put('/{id}', 'BairroDeliveryController@update')->name('bairrosDelivery.update');
+    Route::put('/{id}', 'BairroDeliveryController@update')->name('bairrosDelivery.underscore.update');
 
     // Rota para excluir um bairro
-    Route::delete('/{id}', 'BairroDeliveryController@destroy')->name('bairrosDelivery.destroy');
+    Route::delete('/{id}', 'BairroDeliveryController@destroy')->name('bairrosDelivery.underscore.destroy');
 
     // Rota para exibir as categorias de bairros relacionados a um user_id
     Route::get('/create/{user_id}', 'BairroDeliveryController@showCategorias')->name('bairrosDelivery.showCategorias');

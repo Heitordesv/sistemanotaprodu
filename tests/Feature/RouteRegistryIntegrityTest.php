@@ -15,6 +15,7 @@ class RouteRegistryIntegrityTest extends TestCase
     public function test_rotas_nomeadas_nao_possuem_nomes_duplicados(): void
     {
         $nomes = [];
+        $duplicados = [];
 
         foreach (app('router')->getRoutes() as $route) {
             $nome = $route->getName();
@@ -24,13 +25,18 @@ class RouteRegistryIntegrityTest extends TestCase
             }
 
             if (array_key_exists($nome, $nomes)) {
-                $this->fail(
-                    "Nome de rota duplicado: {$nome} ({$nomes[$nome]} e {$this->descricao($route)})"
-                );
+                $duplicados[] = "{$nome} ({$nomes[$nome]} e {$this->descricao($route)})";
+                continue;
             }
 
             $nomes[$nome] = $this->descricao($route);
         }
+
+        $this->assertSame(
+            [],
+            $duplicados,
+            "Nomes de rota duplicados:\n- " . implode("\n- ", $duplicados)
+        );
     }
 
     private function descricao(Route $route): string
