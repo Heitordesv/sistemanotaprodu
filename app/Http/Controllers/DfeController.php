@@ -30,6 +30,7 @@ use App\Helpers\StockMove;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Cache;
 
 class DfeController extends Controller
 {
@@ -83,10 +84,19 @@ class DfeController extends Controller
 
 	public function getDocumentosNovos(Request $request)
 	{
+		$lock = null;
+		$lockObtido = false;
 		try {
 			$request->validate(['local' => 'nullable|integer|min:0']);
 			$empresaId = (int) $request->empresa_id;
 			$local = (int) $request->input('local', 0);
+			$lock = Cache::lock("dfe:consulta:{$empresaId}:{$local}", 120);
+			$lockObtido = $lock->get();
+			if (!$lockObtido) {
+				return response()->json([
+					'message' => 'Já existe uma consulta em andamento. Aguarde a conclusão antes de tentar novamente.'
+				], 409);
+			}
 			$config = ConfigNota::where('empresa_id', $request->empresa_id)
 			->first();
 			if (!$config || !$config->arquivo) {
@@ -137,11 +147,12 @@ class DfeController extends Controller
 			$docs = $dfe_service->novaConsulta($nsu);
 			$novos = [];
 
-			if (!isset($docs['erro'])) {
+			if (is_array($docs) && !isset($docs['erro'])) {
 
 				$novos = [];
 				foreach ($docs as $d) {
-					if ((float) ($d['valor'] ?? 0) <= 0 || empty($d['nome']) || empty($d['chave'])) {
+					$d = $this->normalizaDocumentoParaResposta($d);
+					if ($d === null) {
 						continue;
 					}
 					$d['empresa_id'] = $empresaId;
@@ -165,7 +176,33 @@ class DfeController extends Controller
 		} catch (\Throwable $e) {
 			report($e);
 			return response()->json(['message' => 'Não foi possível consultar a SEFAZ. Verifique o certificado e tente novamente.'], 500);
+		} finally {
+			if ($lock && $lockObtido) {
+				$lock->release();
+			}
 		}
+	}
+
+	private function normalizaDocumentoParaResposta(array $documento): ?array
+	{
+		$chave = preg_replace('/\D+/', '', (string) ($documento['chave'] ?? ''));
+		$cnpjCpf = preg_replace('/\D+/', '', (string) ($documento['documento'] ?? ''));
+		$nome = trim((string) ($documento['nome'] ?? ''));
+		$valor = filter_var($documento['valor'] ?? null, FILTER_VALIDATE_FLOAT);
+
+		if (strlen($chave) !== 44 || $nome === '' || $valor === false || $valor < 0) {
+			return null;
+		}
+
+		return array_merge($documento, [
+			'chave' => $chave,
+			'documento' => $cnpjCpf,
+			'nome' => $nome,
+			'valor' => number_format((float) $valor, 2, '.', ''),
+			'num_prot' => (string) ($documento['num_prot'] ?? ''),
+			'data_emissao' => (string) ($documento['data_emissao'] ?? ''),
+			'nsu' => (int) ($documento['nsu'] ?? 0),
+		]);
 	}
 
 	public function manifestar(Request $request)
@@ -178,17 +215,17 @@ class DfeController extends Controller
 				'justificativa' => ($evento === 4 ? 'required' : 'nullable') . '|string|min:15|max:255',
 			]);
 
-			$config = ConfigNota::where('empresa_id', $request->empresa_id)->first();
-			if (!$config) {
-				throw new \RuntimeException('Configure o emitente antes de manifestar o documento.');
-			}
+			$manifestoDocumento = ManifestaDfe::where('empresa_id', $request->empresa_id)
+				->where('chave', $request->chave)
+				->firstOrFail();
+			$config = $this->configuracaoDoManifesto($manifestoDocumento);
 
 			$cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
 			$dfe_service = new DFeService([
 				"atualizacao" => date('Y-m-d h:i:s'),
 				"tpAmb" => 1,
 				"razaosocial" => $config->razao_social,
-				"siglaUF" => $config->cidade->uf,
+				"siglaUF" => $config->UF ?? optional($config->cidade)->uf,
 				"cnpj" => $cnpj,
 				"schemes" => "PL_009_V4",
 				"versao" => "4.00",
@@ -219,14 +256,11 @@ class DfeController extends Controller
 				throw new \RuntimeException('A SEFAZ retornou uma resposta inválida para a manifestação.');
 			}
 
-			if ($res['retEvento']['infEvento']['cStat'] == '135') { //sucesso
+			if (in_array((string) $res['retEvento']['infEvento']['cStat'], ['135', '136'], true)) { //sucesso
 
-				$manifesto = ManifestaDfe::where('empresa_id', $request->empresa_id)
-				->where('chave', $request->chave)
-				->firstOrFail();
-				$manifesto->sequencia_evento = $manifestaAnterior != null ? ($manifestaAnterior->sequencia_evento + 1) : 1;
-				$manifesto->tipo = $evento;
-				$manifesto->save();
+				$manifestoDocumento->sequencia_evento = $numEvento;
+				$manifestoDocumento->tipo = $evento;
+				$manifestoDocumento->save();
 
 				// ManifestaDfe::create($manifesta);
 				session()->flash('flash_sucesso', $res['retEvento']['infEvento']['xMotivo'] . ": " . $request->chave);
@@ -258,6 +292,22 @@ class DfeController extends Controller
 		->where('chave', $chave)->first();
 	}
 
+	private function configuracaoDoManifesto(ManifestaDfe $manifesto)
+	{
+		if ((int) $manifesto->filial_id > 0) {
+			$config = Filial::where('empresa_id', request()->empresa_id)
+				->find($manifesto->filial_id);
+		} else {
+			$config = ConfigNota::where('empresa_id', request()->empresa_id)->first();
+		}
+
+		if (!$config || !$config->arquivo) {
+			throw new \RuntimeException('Configure o emitente e o certificado antes de continuar.');
+		}
+
+		return $config;
+	}
+
 	public function download($id)
 	{
 		$naturezaPadrao = NaturezaOperacao::where('empresa_id', request()->empresa_id)->first();
@@ -272,16 +322,15 @@ class DfeController extends Controller
 		$subDivisoes = DivisaoGrade::where('empresa_id', request()->empresa_id)
 		->where('sub_divisao', true)
 		->get();
-		$config = ConfigNota::where('empresa_id', request()->empresa_id)
-		->first();
 		$dfe = $this->manifestoDaEmpresa($id);
+		$config = $this->configuracaoDoManifesto($dfe);
 		$chave = $dfe->chave;
 		$cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
 		$dfe_service = new DFeService([
 			"atualizacao" => date('Y-m-d h:i:s'),
 			"tpAmb" => 1,
 			"razaosocial" => $config->razao_social,
-			"siglaUF" => $config->cidade->uf,
+			"siglaUF" => $config->UF ?? optional($config->cidade)->uf,
 			"cnpj" => $cnpj,
 			"schemes" => "PL_009_V4",
 			"versao" => "4.00",
@@ -768,15 +817,12 @@ public function storeCompra(Request $request)
 			File::delete($arquivo);
 		}
 
-		$config = ConfigNota::where('empresa_id', request()->empresa_id)->first();
-		if (!$config || !$config->arquivo) {
-			throw new \RuntimeException('Emitente ou certificado não configurado.');
-		}
+		$config = $this->configuracaoDoManifesto($item);
 		$service = new DFeService([
 			'atualizacao' => date('Y-m-d H:i:s'),
 			'tpAmb' => 1,
 			'razaosocial' => $config->razao_social,
-			'siglaUF' => optional($config->cidade)->uf,
+			'siglaUF' => $config->UF ?? optional($config->cidade)->uf,
 			'cnpj' => preg_replace('/[^0-9]/', '', $config->cnpj),
 			'schemes' => 'PL_009_V4',
 			'versao' => '4.00',

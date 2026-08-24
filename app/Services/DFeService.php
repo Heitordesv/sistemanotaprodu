@@ -36,6 +36,8 @@ class DFeService{
 		$imprime = false;
 		$arrayDocs = [];
 		$respostas = [];
+		$ultimoStatus = null;
+		$ultimoMotivo = '';
 		while ($ultNSU <= $maxNSU) {
 			$iCount++;
 			if ($iCount >= $loopLimit) {
@@ -55,10 +57,15 @@ class DFeService{
 				$dom->loadXML($resp);
 
 				$node = $dom->getElementsByTagName('retDistDFeInt')->item(0);
+				if (!$node) {
+					throw new \RuntimeException('A SEFAZ retornou uma resposta de distribuição inválida.');
+				}
 				$tpAmb = $node->getElementsByTagName('tpAmb')->item(0)->nodeValue;
 				$verAplic = $node->getElementsByTagName('verAplic')->item(0)->nodeValue;
 				$cStat = $node->getElementsByTagName('cStat')->item(0)->nodeValue;
 				$xMotivo = $node->getElementsByTagName('xMotivo')->item(0)->nodeValue;
+				$ultimoStatus = (string) $cStat;
+				$ultimoMotivo = trim((string) $xMotivo);
 				$dhResp = $node->getElementsByTagName('dhResp')->item(0)->nodeValue;
 				$ultNSU = $node->getElementsByTagName('ultNSU')->item(0)->nodeValue;
 				$maxNSU = $node->getElementsByTagName('maxNSU')->item(0)->nodeValue;
@@ -84,42 +91,47 @@ class DFeService{
 						$numnsu = $doc->getAttribute('NSU');
 						$schema = $doc->getAttribute('schema');
 
-						$content = gzdecode(base64_decode($doc->nodeValue));
-						$xml = simplexml_load_string($content);
+						$content = gzdecode(base64_decode((string) $doc->nodeValue, true));
+						if (!is_string($content) || $content === '') {
+							continue;
+						}
 
-						$temp = [
-							'documento' => $xml->CNPJ,
-							'nome' => $xml->xNome,
-							'data_emissao' => $xml->dhEmi,
-							'valor' => $xml->vNF,
-							'num_prot' => $xml->nProt,
-							'chave' => $xml->chNFe,
-							'nsu' => $ultNSU,
-							'tipo' => 0,
-							'fatura_salva' => false,
-							'sequencia_evento' => 0,
-							'empresa_id' => $this->empresa_id
-						];
-						
-						array_push($arrayDocs, $temp);
+						$temp = self::normalizaDocumentoDistribuido(
+							$content,
+							$schema,
+							$numnsu,
+							(int) $this->empresa_id
+						);
+						if ($temp !== null) {
+							$arrayDocs[] = $temp;
+						}
 						
 						$tipo = substr($schema, 0, 6);
 
 					}
 					sleep(2);
 				}
-			} catch (\Exception $e) {
-				// echo "service: " . $e->getMessage();
+			} catch (\Throwable $e) {
+				report($e);
 				return [
 					"erro" => 1,
-					"message" => $e->getMessage()
+					"message" => 'A resposta da SEFAZ não pôde ser processada.'
 				];
 			}
 
 		}
 
 		if(sizeof($arrayDocs) > 0){
+			// Guarda no último documento o cursor confirmado pela SEFAZ. Assim,
+			// eventos ignorados na tela não fazem a próxima consulta repetir o lote.
+			$arrayDocs[array_key_last($arrayDocs)]['nsu'] = (int) $ultNSU;
 			return $arrayDocs;
+		}
+
+		// 137 significa que a consulta foi aceita, mas não existem documentos novos.
+		// Isso não é erro e precisa chegar ao controller como uma lista vazia.
+		if ($ultimoStatus === '137') {
+			return [];
 		}else{
 
 			$search1 = 'Consumo Indevido';
@@ -148,10 +160,71 @@ class DFeService{
 
 			return [
 				"erro" => 1,
-				"message" => $xMotivo
+				"message" => $xMotivo ?: ($ultimoMotivo ?: 'Não foi possível consultar os documentos na SEFAZ.')
 			];
 		}
 
+	}
+
+	/**
+	 * Converte qualquer documento retornado na distribuição em valores escalares.
+	 * A biblioteca SimpleXML não pode ser enviada diretamente ao navegador, pois
+	 * seria serializada como objeto e exibida como "[object Object]".
+	 */
+	public static function normalizaDocumentoDistribuido(
+		string $conteudo,
+		string $schema,
+		string $nsu,
+		int $empresaId
+	): ?array {
+		libxml_use_internal_errors(true);
+		$xml = simplexml_load_string($conteudo);
+		libxml_clear_errors();
+		if ($xml === false) {
+			return null;
+		}
+
+		$valorXpath = static function (\SimpleXMLElement $documento, string $nome): string {
+			$resultado = $documento->xpath('//*[local-name()="' . $nome . '"][1]');
+			return isset($resultado[0]) ? trim((string) $resultado[0]) : '';
+		};
+
+		$chave = preg_replace('/\D+/', '', $valorXpath($xml, 'chNFe'));
+		if (strlen($chave) !== 44) {
+			$atributos = $xml->xpath('//*[local-name()="infNFe"][1]/@Id');
+			$id = isset($atributos[0]) ? (string) $atributos[0] : '';
+			$chave = preg_replace('/\D+/', '', $id);
+		}
+
+		$documento = preg_replace('/\D+/', '', $valorXpath($xml, 'CNPJ'));
+		if ($documento === '') {
+			$documento = preg_replace('/\D+/', '', $valorXpath($xml, 'CPF'));
+		}
+
+		$nome = $valorXpath($xml, 'xNome');
+		$valor = str_replace(',', '.', $valorXpath($xml, 'vNF'));
+		$dataEmissao = $valorXpath($xml, 'dhEmi') ?: $valorXpath($xml, 'dEmi');
+		$protocolo = $valorXpath($xml, 'nProt');
+		$nsuNumerico = preg_replace('/\D+/', '', $nsu);
+
+		// Eventos e documentos de outros modelos também podem vir no lote.
+		if (strlen($chave) !== 44 || $nome === '' || !is_numeric($valor)) {
+			return null;
+		}
+
+		return [
+			'documento' => $documento,
+			'nome' => $nome,
+			'data_emissao' => $dataEmissao,
+			'valor' => number_format((float) $valor, 2, '.', ''),
+			'num_prot' => $protocolo,
+			'chave' => $chave,
+			'nsu' => $nsuNumerico === '' ? 0 : (int) $nsuNumerico,
+			'tipo' => 0,
+			'fatura_salva' => false,
+			'sequencia_evento' => 0,
+			'empresa_id' => $empresaId,
+		];
 	}
 
 	public function consulta($data_inicial, $data_final){

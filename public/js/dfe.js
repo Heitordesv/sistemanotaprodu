@@ -49,12 +49,50 @@ function buscarDocumentos() {
 function montaTabela(array, call) {
     let html = '';
     array.forEach(v => {
+        const nome = textoSeguro(v && v.nome);
+        const documento = formataDocumento(textoSeguro(v && v.documento));
+        const chave = textoSeguro(v && v.chave).replace(/\D/g, '');
+        const valor = numeroSeguro(v && v.valor);
+
+        if (!nome || chave.length !== 44 || valor === null) {
+            return;
+        }
+
         html += '<tr>';
-        html += '<td>' + v.nome + '</td>';
-        html += '<td>' + v.documento + '</td>';
-        html += '<td>' + parseFloat(v.valor).toLocaleString('pt-br', {style: 'currency', currency: 'BRL'}) + '</td>';
-        html += '<td>' + v.chave + '</td>';
+        html += '<td>' + escapaHtml(nome) + '</td>';
+        html += '<td>' + escapaHtml(documento || 'Não informado') + '</td>';
+        html += '<td>' + valor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) + '</td>';
+        html += '<td class="text-nowrap">' + escapaHtml(chave) + '</td>';
         html += '</tr>';
     });
     call(html);
+}
+
+function textoSeguro(valor) {
+    if (valor === null || typeof valor === 'undefined') return '';
+    if (typeof valor === 'string' || typeof valor === 'number') return String(valor).trim();
+    return '';
+}
+
+function numeroSeguro(valor) {
+    if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
+    const texto = textoSeguro(valor).replace(/\s/g, '').replace(',', '.');
+    if (!texto) return null;
+    const numero = Number(texto);
+    return Number.isFinite(numero) ? numero : null;
+}
+
+function formataDocumento(valor) {
+    const numeros = valor.replace(/\D/g, '');
+    if (numeros.length === 14) {
+        return numeros.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    }
+    if (numeros.length === 11) {
+        return numeros.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    }
+    return numeros;
+}
+
+function escapaHtml(valor) {
+    return $('<div>').text(valor).html();
 }
