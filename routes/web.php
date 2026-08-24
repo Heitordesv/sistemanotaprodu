@@ -1443,6 +1443,18 @@ Route::resource('funcionarios', FuncionarioController::class);
         Route::post('/enviar-xml', 'NfeController@enviarXml')->name('nfe.enviar-xml');
     });
 
+    // Acoes iniciadas pela tela web usam o tenant autenticado da sessao.
+    // As rotas /api/nfe permanecem disponiveis para clientes legados por hash.
+    Route::group(['prefix' => 'nfe/acoes'], function () {
+        Route::post('/consulta-status-sefaz', 'API\\NFeController@consultaStatusSefaz')
+            ->name('nfe.acoes.consulta-status-sefaz');
+        Route::post('/consultar', 'API\\NFeController@consultarNfe')
+            ->name('nfe.acoes.consultar');
+        Route::post('/transmitir', 'API\\NFeController@transmitir')
+            ->middleware('limiteNFe')
+            ->name('nfe.acoes.transmitir');
+    });
+
 
     Route::group(['prefix' => 'nfce'], function () {
         Route::get('/xml-temp/{id}', 'NfceController@xmlTemp')->name('nfce.xml-temp');

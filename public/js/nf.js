@@ -62,18 +62,33 @@ function getCheckedElement(callback) {
 	callback(el)
 }
 
+function nfeEndpoint(name, fallback) {
+	return (window.nfeWebEndpoints && window.nfeWebEndpoints[name]) || (path_url + fallback)
+}
+
+function nfeErrorMessage(xhr, fallback) {
+	let response = xhr && xhr.responseJSON
+
+	if (typeof response === 'string' && response.trim()) return response
+	if (response && typeof response.message === 'string' && response.message.trim()) return response.message
+	if (response && typeof response.error === 'string' && response.error.trim()) return response.error
+	if (xhr && typeof xhr.responseText === 'string' && xhr.responseText.trim() && xhr.responseText.trim().charAt(0) !== '<') {
+		return xhr.responseText.trim()
+	}
+
+	return fallback
+}
+
 /* ===============================
    CONSULTA STATUS SEFAZ
 ================================ */
 $('.btn-consulta-status').click(() => {
-	let empresa_id = $("#empresa_id").val()
-
-	$.post(path_url + 'api/nfe/consulta-status-sefaz', { empresa_id })
+	$.post(nfeEndpoint('consultarStatus', 'api/nfe/consulta-status-sefaz'))
 	.done(res => {
 		let msg = `cStat: ${res.cStat}\nMotivo: ${res.xMotivo}\nAmbiente: ${res.tpAmb == 2 ? "Homologação" : "Produção"}\nverAplic: ${res.verAplic}`
 		swal("Sucesso", msg, "success")
 	})
-	.fail(() => swal("Erro", "Falha ao consultar SEFAZ", "error"))
+	.fail(xhr => swal("Erro", nfeErrorMessage(xhr, "Falha ao consultar SEFAZ"), "error"))
 })
 
 /* ===============================
@@ -83,16 +98,14 @@ $('#btn-enviar').click(() => {
 	getChecked(id => {
 		if (!id) return swal("Alerta", "Selecione uma venda!", "warning")
 
-		let empresa_id = $("#empresa_id").val()
-
-		$.post(path_url + "api/nfe/transmitir", { id, empresa_id })
+		$.post(nfeEndpoint('transmitir', 'api/nfe/transmitir'), { id })
 		.done(() => {
 			swal("Sucesso", "NFe emitida", "success").then(() => {
 				window.open(path_url + 'nfe/imprimir/' + id, "_blank")
 				location.reload()
 			})
 		})
-		.fail(err => swal("Erro", err.responseJSON || "Erro ao transmitir", "error"))
+		.fail(xhr => swal("Erro", nfeErrorMessage(xhr, "Erro ao transmitir"), "error"))
 	})
 })
 
@@ -114,9 +127,7 @@ $('#btn-consultar').click(() => {
 	getChecked(id => {
 		if (!id) return swal("Alerta", "Selecione uma venda!", "warning")
 
-		let empresa_id = $("#empresa_id").val()
-
-		$.post(path_url + "api/nfe/consulta-nfe", { id, empresa_id })
+		$.post(nfeEndpoint('consultar', 'api/nfe/consulta-nfe'), { id })
 		.done(res => {
 			if (res.protNFe) {
 				let p = res.protNFe.infProt
@@ -125,6 +136,7 @@ $('#btn-consultar').click(() => {
 				swal("Alerta", res.xMotivo, "warning")
 			}
 		})
+		.fail(xhr => swal("Erro", nfeErrorMessage(xhr, "Falha ao consultar a NF-e"), "error"))
 	})
 })
 

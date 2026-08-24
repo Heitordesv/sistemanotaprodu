@@ -340,6 +340,13 @@
 
 @section('js')
 
+<script>
+window.nfeWebEndpoints = {
+    consultarStatus: @json(route('nfe.acoes.consulta-status-sefaz')),
+    consultar: @json(route('nfe.acoes.consultar')),
+    transmitir: @json(route('nfe.acoes.transmitir'))
+};
+</script>
 <script type="text/javascript" src="/js/nf.js"></script>
 <script type="text/javascript" src="{{ asset('js/vendas.js') }}?v={{ filemtime(public_path('js/vendas.js')) }}"></script>
 

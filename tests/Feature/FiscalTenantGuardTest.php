@@ -321,6 +321,46 @@ class FiscalTenantGuardTest extends TestCase
         $this->assertContains(['natureza', 30, 96], $guard->calls);
     }
 
+    public function test_acoes_nfe_da_tela_web_usam_tenant_da_sessao_e_validam_venda(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/nfe/acoes/transmitir',
+            'POST',
+            NFeController::class . '@transmitir',
+            ['id' => 98, 'empresa_id' => 999]
+        );
+
+        (new ResolveFiscalWebTenantContext($guard))->handle(
+            $request,
+            fn ($req) => response()->json(['ok' => true])
+        );
+
+        $this->assertSame(30, (int) $request->empresa_id);
+        $this->assertContains(['web_tenant', 30], $guard->calls);
+        $this->assertContains(['venda', 30, 98], $guard->calls);
+    }
+
+    public function test_consulta_status_nfe_web_usa_tenant_da_sessao_sem_exigir_venda(): void
+    {
+        $guard = new RecordingFiscalTenantGuard();
+        $request = $this->requestWithAction(
+            '/nfe/acoes/consulta-status-sefaz',
+            'POST',
+            NFeController::class . '@consultaStatusSefaz',
+            ['empresa_id' => 999]
+        );
+
+        (new ResolveFiscalWebTenantContext($guard))->handle(
+            $request,
+            fn ($req) => response()->json(['ok' => true])
+        );
+
+        $this->assertSame(30, (int) $request->empresa_id);
+        $this->assertContains(['web_tenant', 30], $guard->calls);
+        $this->assertNotContains(['venda', 30, 0], $guard->calls);
+    }
+
     public function test_web_remove_senha_valida_confignota_no_tenant(): void
     {
         $guard = new RecordingFiscalTenantGuard();

@@ -12,6 +12,7 @@ use App\Models\NuvemShopPedido;
 use App\Models\PedidoEcommerce;
 use App\Models\EscritorioContabil;
 use App\Services\NFService;
+use Illuminate\Support\Facades\Log;
 
 class NFeController extends Controller
 {
@@ -93,8 +94,17 @@ class NFeController extends Controller
                     return response()->json($nfe['erros_xml'], 401);
                 }
             }
-        } catch (\Exception $e) {
-            return response()->json($e->getMessage(), 404);
+            return response()->json([
+                'message' => 'Esta NF-e não está disponível para transmissão.'
+            ], 409);
+        } catch (\Throwable $e) {
+            Log::error('Falha ao transmitir NF-e.', [
+                'empresa_id' => (int) $request->empresa_id,
+                'venda_id' => (int) $request->id,
+                'exception' => $e,
+            ]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
         }
     }
 
@@ -112,23 +122,36 @@ class NFeController extends Controller
         where('empresa_id', $request->empresa_id)
         ->first();
 
-        $cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
+        if ($config == null) {
+            return response()->json(['message' => 'Configure o emitente desta empresa.'], 422);
+        }
 
-        $nfe_service = new NFService([
-            "atualizacao" => date('Y-m-d h:i:s'),
-            "tpAmb" => (int)$config->ambiente,
-            "razaosocial" => $config->razao_social,
-            "siglaUF" => $config->cidade->uf,
-            "cnpj" => $cnpj,
-            "schemes" => "PL_009_V4",
-            "versao" => "4.00",
-            "tokenIBPT" => "AAAAAAA",
-            "CSC" => $config->csc,
-            "CSCid" => $config->csc_id,
-            "is_filial" => 0
-        ], $config);
-        $consulta = $nfe_service->consultaStatus((int)$config->ambiente, $config->cidade->uf);
-        return response()->json($consulta, 200);
+        try {
+            $cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
+
+            $nfe_service = new NFService([
+                "atualizacao" => date('Y-m-d h:i:s'),
+                "tpAmb" => (int)$config->ambiente,
+                "razaosocial" => $config->razao_social,
+                "siglaUF" => $config->cidade->uf,
+                "cnpj" => $cnpj,
+                "schemes" => "PL_009_V4",
+                "versao" => "4.00",
+                "tokenIBPT" => "AAAAAAA",
+                "CSC" => $config->csc,
+                "CSCid" => $config->csc_id,
+                "is_filial" => 0
+            ], $config);
+            $consulta = $nfe_service->consultaStatus((int)$config->ambiente, $config->cidade->uf);
+            return response()->json($consulta, 200);
+        } catch (\Throwable $e) {
+            Log::error('Falha ao consultar status da SEFAZ.', [
+                'empresa_id' => (int) $request->empresa_id,
+                'exception' => $e,
+            ]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function consultaCadastro(Request $request)
@@ -173,21 +196,39 @@ class NFeController extends Controller
         $config = ConfigNota::where('empresa_id', $request->empresa_id)
         ->first();
 
-        $cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
-        $nfe_service = new NFService([
-            "atualizacao" => date('Y-m-d h:i:s'),
-            "tpAmb" => (int)$config->ambiente,
-            "razaosocial" => $config->razao_social,
-            "siglaUF" => $config->cidade->uf,
-            "cnpj" => $cnpj,
-            "schemes" => "PL_009_V4",
-            "versao" => "4.00",
-            "tokenIBPT" => "AAAAAAA",
-            "CSC" => $config->csc,
-            "CSCid" => $config->csc_id
-        ], $config);
-        $consulta = $nfe_service->consultar($venda);
-        return response()->json($consulta, 200);
+        if ($config == null) {
+            return response()->json(['message' => 'Configure o emitente desta empresa.'], 422);
+        }
+
+        if (trim((string) $venda->chave) === '') {
+            return response()->json(['message' => 'A NF-e selecionada ainda não possui chave de acesso.'], 422);
+        }
+
+        try {
+            $cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
+            $nfe_service = new NFService([
+                "atualizacao" => date('Y-m-d h:i:s'),
+                "tpAmb" => (int)$config->ambiente,
+                "razaosocial" => $config->razao_social,
+                "siglaUF" => $config->cidade->uf,
+                "cnpj" => $cnpj,
+                "schemes" => "PL_009_V4",
+                "versao" => "4.00",
+                "tokenIBPT" => "AAAAAAA",
+                "CSC" => $config->csc,
+                "CSCid" => $config->csc_id
+            ], $config);
+            $consulta = $nfe_service->consultar($venda);
+            return response()->json($consulta, 200);
+        } catch (\Throwable $e) {
+            Log::error('Falha ao consultar NF-e na SEFAZ.', [
+                'empresa_id' => (int) $request->empresa_id,
+                'venda_id' => (int) $request->id,
+                'exception' => $e,
+            ]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function cancelar(Request $request)

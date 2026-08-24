@@ -6,6 +6,7 @@ use App\Http\Controllers\ConfigNotaController;
 use App\Http\Controllers\NaturezaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\API\GraficoController;
+use App\Http\Controllers\API\NFeController as ApiNFeController;
 use App\Http\Controllers\API\ProdutoController as ApiProdutoController;
 use App\Services\FiscalTenantGuardService;
 use Closure;
@@ -19,6 +20,7 @@ class ResolveFiscalWebTenantContext
         ConfigNotaController::class,
         ApiProdutoController::class,
         GraficoController::class,
+        ApiNFeController::class,
     ];
 
     private const CONFIG_ACTIONS_WITH_RESOURCE = [
@@ -41,6 +43,17 @@ class ResolveFiscalWebTenantContext
         }
 
         $empresaId = $this->guard->empresaIdDaSessao($request);
+
+        if ($controller === ApiNFeController::class) {
+            $vendaId = $request->input('id');
+
+            if (is_scalar($vendaId) && ctype_digit((string) $vendaId) && (int) $vendaId > 0) {
+                $this->guard->venda($empresaId, (int) $vendaId);
+            }
+
+            return $next($request);
+        }
+
         $resourceId = $this->firstNumericRouteParameter($request);
 
         if ($resourceId !== null) {
