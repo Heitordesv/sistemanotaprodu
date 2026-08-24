@@ -14,7 +14,8 @@ class VendaCaixa extends Model
 		'desconto_tipo', 'desconto_percentual', 'acrescimo_tipo', 'acrescimo_percentual',
 		'taxa_entrega', 'pedido_delivery_id', 'empresa_id', 'bandeira_cartao',
 		'cnpj_cartao', 'cAut_cartao', 'descricao_pag_outros', 'rascunho', 'consignado', 'pdv_java',
-		'retorno_estoque', 'qr_code_base64', 'filial_id', 'abertura_caixa_id'
+		'retorno_estoque', 'qr_code_base64', 'filial_id', 'abertura_caixa_id',
+		'lista_preco_id'
 	];
 
 
@@ -25,6 +26,11 @@ class VendaCaixa extends Model
     public function aberturaCaixa()
     {
         return $this->belongsTo(AberturaCaixa::class, 'abertura_caixa_id');
+    }
+
+    public function listaPreco()
+    {
+        return $this->belongsTo(ListaPreco::class, 'lista_preco_id');
     }
 	
 	public function itens(){
