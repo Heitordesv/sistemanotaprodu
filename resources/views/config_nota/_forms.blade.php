@@ -264,6 +264,11 @@
             </label>';
         @endphp
         {!! Form::text('token_ibpt', 'Token IBPT (opcional)' . $appendAttr)->attrs(['class' => 'form-control']) !!}
+        @if(isset($item) && $item)
+        <a href="{{ route('configNF.ibpt') }}" class="btn btn-outline-primary btn-sm mt-2">
+            <i class="bx bx-refresh"></i> Atualizar IBPT dos produtos desta empresa
+        </a>
+        @endif
     </div>
 
     <!-- Campo Token NFSe -->

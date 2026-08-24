@@ -1053,6 +1053,8 @@ Route::get('/vendas-geral-view', 'RelatorioController@relatorioVendasGeralView')
     Route::resource('produtoDelivery', 'ProdutoDeliveryController');
 
     Route::group(['prefix' => 'configNF'], function () {
+        Route::get('/ibpt', 'IbptEmpresaController@index')->name('configNF.ibpt');
+        Route::post('/ibpt/sincronizar', 'IbptEmpresaController@sync')->name('configNF.ibpt.sync');
         Route::get('/certificados', 'ConfigNotaController@certificadosFresh');
         Route::get('/deleteCertificado', 'ConfigNotaController@deleteCertificado')->name('configNF.deleteCertificado');
         Route::get('/remove-logo', 'ConfigNotaController@removeLogo')->name('configNF.remove-logo');
