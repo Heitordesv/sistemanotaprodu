@@ -366,12 +366,16 @@
 
                 <div class="pdv-price-list">
                     <label for="lista-precos-pdv">Lista de preços</label>
-                    <select id="lista-precos-pdv" class="form-select" aria-label="Lista de preços">
-                        @forelse(($lista ?? []) as $listaPreco)
-                            <option value="{{ $listaPreco->id ?? '' }}">{{ $listaPreco->nome }}</option>
-                        @empty
-                            <option value="">Lista padrão</option>
-                        @endforelse
+                    <select
+                        id="lista-precos-pdv"
+                        name="lista_preco_id"
+                        class="form-select"
+                        aria-label="Lista de preços"
+                    >
+                        <option value="">Preço padrão</option>
+                        @foreach(($lista ?? []) as $listaPreco)
+                            <option value="{{ $listaPreco->id }}">{{ $listaPreco->nome }}</option>
+                        @endforeach
                     </select>
                 </div>
 
