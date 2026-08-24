@@ -97,13 +97,20 @@ class FrontBoxController extends Controller
         );
 
         return app(\App\Http\Controllers\API\ProdutoController::class)
-            ->find($id);
+            ->find(
+                $id,
+                $request,
+                app(\App\Services\PdvListaPrecoService::class)
+            );
     }
 
     public function produtosFindByBarcode(Request $request)
     {
         return app(\App\Http\Controllers\API\ProdutoController::class)
-            ->findByBarcode($request);
+            ->findByBarcode(
+                $request,
+                app(\App\Services\PdvListaPrecoService::class)
+            );
     }
 
     public function produtosFindByBarcodeReference(Request $request)

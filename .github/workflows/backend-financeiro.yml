@@ -88,6 +88,7 @@ jobs:
       - name: PDV delivery fee and adjustment tests
         run: |
           vendor/bin/phpunit tests/Unit/PdvTotalServiceTest.php
+          vendor/bin/phpunit tests/Feature/PdvListaPrecoTest.php
           vendor/bin/phpunit tests/Unit/PdvReceiptPdfServiceTest.php
           vendor/bin/phpunit tests/Unit/NFCeItemAdjustmentRateioServiceTest.php
           vendor/bin/phpunit tests/Integration/NFCeFiscalAdjustmentXmlTest.php
