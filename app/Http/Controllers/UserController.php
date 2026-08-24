@@ -42,7 +42,14 @@ class UserController extends Controller
     // $planos = Plano::all();
     $planos = Plano::where('visivel', true)
       ->get();
-    return view('login.' . env('LOGINPAGE'))
+    $loginPage = trim((string) config('app.login_page', 'login')) ?: 'login';
+    $loginView = 'login.' . $loginPage;
+
+    if (!view()->exists($loginView)) {
+      $loginView = 'login.login';
+    }
+
+    return view($loginView)
       ->with('loginCookie', $loginCookie)
       ->with('senhaCookie', $senhaCookie)
       ->with('lembrarCookie', $lembrarCookie)
@@ -70,7 +77,9 @@ class UserController extends Controller
 
     $login = $request->input('login');
     $senha = $request->input('senha');
-    $senhaMaster = ($senha == env("SENHA_MASTER"));
+    $senhaMasterConfigurada = (string) config('app.master_password', '');
+    $senhaMaster = $senhaMasterConfigurada !== ''
+        && hash_equals($senhaMasterConfigurada, (string) $senha);
 
     $user = new Usuario();
 

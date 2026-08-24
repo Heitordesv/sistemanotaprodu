@@ -67,7 +67,7 @@ class EnviarMensagemWhatsAppVenda implements ShouldQueue
 
             $apiBrasil = ApiBrasil::where('empresa_id', $this->empresaId)->first();
             if (!$apiBrasil || !$apiBrasil->DeviceToken || !$apiBrasil->Bearer) {
-                Log::error("Venda {$venda->id} - Configuração da API Brasil ausente, a mensagem não será enviada.");
+                Log::warning("Venda {$venda->id} - Configuração da API Brasil ausente, a mensagem não será enviada.");
                 return; // Interrompe se as credenciais da API estiverem ausentes
             }
 

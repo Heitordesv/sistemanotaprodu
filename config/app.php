@@ -17,6 +17,10 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Keep environment access inside configuration so config:cache is safe.
+    'login_page' => env('LOGINPAGE', 'login'),
+    'master_password' => env('SENHA_MASTER'),
+
 
     // Adicionando a variável do Bearer Token corretamente
     'bearer_token' => env('BEARER_TOKEN','Laravel'),

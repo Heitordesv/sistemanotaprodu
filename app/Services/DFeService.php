@@ -6,9 +6,6 @@ use NFePHP\Common\Certificate;
 use App\Models\Certificado;
 use NFePHP\NFe\Common\Standardize;
 
-error_reporting(E_ALL);
-ini_set('display_errors', 'On');
-
 class DFeService{
 
 	private $config; 
@@ -294,45 +291,17 @@ class DFeService{
 	}
 
 	public function desconhecimento($chave, $nSeqEvento, $justificativa){
-		try {
+		$xJust = trim((string) $justificativa);
+		$response = $this->tools->sefazManifesta($chave, '210240', $xJust, $nSeqEvento);
 
-			$chNFe = $chave;
-			$tpEvento = '210240'; 
-			$xJust = $justificativa; 
-			$nSeqEvento = $nSeqEvento;
-
-			$response = $this->tools->sefazManifesta($chNFe, $tpEvento, $xJust, $nSeqEvento);
-
-			$st = new Standardize($response);
-
-			$arr = $st->toArray();
-
-			return $arr;
-
-		} catch (\Exception $e) {
-			echo $e->getMessage();
-		}
+		return (new Standardize($response))->toArray();
 	}
 
 	public function operacaoNaoRealizada($chave, $nSeqEvento, $justificativa){
-		try {
+		$xJust = trim((string) $justificativa);
+		$response = $this->tools->sefazManifesta($chave, '210220', $xJust, $nSeqEvento);
 
-			$chNFe = $chave;
-			$tpEvento = '210220'; 
-			$xJust = $justificativa; 
-			$nSeqEvento = $nSeqEvento;
-
-			$response = $this->tools->sefazManifesta($chNFe, $tpEvento, $xJust, $nSeqEvento);
-
-			$st = new Standardize($response);
-
-			$arr = $st->toArray();
-
-			return $arr;
-
-		} catch (\Exception $e) {
-			echo $e->getMessage();
-		}
+		return (new Standardize($response))->toArray();
 	}
 
 	

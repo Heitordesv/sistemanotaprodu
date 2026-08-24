@@ -146,46 +146,54 @@ class DfeController extends Controller
 
 	public function manifestar(Request $request)
 	{
-
-		$config = ConfigNota::where('empresa_id', $request->empresa_id)
-		->first();
-
-		$cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
-
-		$dfe_service = new DFeService([
-			"atualizacao" => date('Y-m-d h:i:s'),
-			"tpAmb" => 1,
-			"razaosocial" => $config->razao_social,
-			"siglaUF" => $config->cidade->uf,
-			"cnpj" => $cnpj,
-			"schemes" => "PL_009_V4",
-			"versao" => "4.00",
-			"tokenIBPT" => "AAAAAAA",
-			"CSC" => $config->csc,
-			"CSCid" => $config->csc_id
-		], $config);
-		$evento = $request->tipo;
-
-		$manifestaAnterior = $this->verificaAnterior($request->chave);
-		$numEvento = $manifestaAnterior != null ? ((int)$manifestaAnterior->sequencia_evento + 1) : 1;
-
-		if ($manifestaAnterior != null && $manifestaAnterior->tipo != $evento) {
-			$numEvento--;
-		}
-
-		if ($numEvento == 0) $numEvento++;
-
-		if ($evento == 1) {
-			$res = $dfe_service->manifesta($request->chave,	$numEvento);
-		} else if ($evento == 2) {
-			$res = $dfe_service->confirmacao($request->chave, $numEvento);
-		} else if ($evento == 3) {
-			$res = $dfe_service->desconhecimento($request->chave, $numEvento, $request->justificativa);
-		} else if ($evento == 4) {
-			$res = $dfe_service->operacaoNaoRealizada($request->chave, $numEvento, $request->justificativa);
-		}
-
 		try {
+			$evento = (int) $request->input('tipo');
+			$request->validate([
+				'tipo' => 'required|integer|in:1,2,3,4',
+				'chave' => 'required|string|size:44',
+				'justificativa' => ($evento === 4 ? 'required' : 'nullable') . '|string|min:15|max:255',
+			]);
+
+			$config = ConfigNota::where('empresa_id', $request->empresa_id)->first();
+			if (!$config) {
+				throw new \RuntimeException('Configure o emitente antes de manifestar o documento.');
+			}
+
+			$cnpj = preg_replace('/[^0-9]/', '', $config->cnpj);
+			$dfe_service = new DFeService([
+				"atualizacao" => date('Y-m-d h:i:s'),
+				"tpAmb" => 1,
+				"razaosocial" => $config->razao_social,
+				"siglaUF" => $config->cidade->uf,
+				"cnpj" => $cnpj,
+				"schemes" => "PL_009_V4",
+				"versao" => "4.00",
+				"tokenIBPT" => "AAAAAAA",
+				"CSC" => $config->csc,
+				"CSCid" => $config->csc_id
+			], $config);
+
+			$manifestaAnterior = $this->verificaAnterior($request->chave);
+			$numEvento = $manifestaAnterior != null ? ((int) $manifestaAnterior->sequencia_evento + 1) : 1;
+
+			if ($manifestaAnterior != null && $manifestaAnterior->tipo != $evento) {
+				$numEvento--;
+			}
+			if ($numEvento == 0) $numEvento++;
+
+			if ($evento === 1) {
+				$res = $dfe_service->manifesta($request->chave, $numEvento);
+			} elseif ($evento === 2) {
+				$res = $dfe_service->confirmacao($request->chave, $numEvento);
+			} elseif ($evento === 3) {
+				$res = $dfe_service->desconhecimento($request->chave, $numEvento, $request->justificativa);
+			} else {
+				$res = $dfe_service->operacaoNaoRealizada($request->chave, $numEvento, $request->justificativa);
+			}
+
+			if (!is_array($res) || data_get($res, 'retEvento.infEvento.cStat') === null) {
+				throw new \RuntimeException('A SEFAZ retornou uma resposta inválida para a manifestação.');
+			}
 
 			if ($res['retEvento']['infEvento']['cStat'] == '135') { //sucesso
 
@@ -212,8 +220,11 @@ class DfeController extends Controller
 				session()->flash("flash_erro", $erro . " - Chave: " . $request->chave);
 			}
 			return redirect()->route('dfe.index');
-		} catch (\Exception $e) {
-			echo $e->getMessage();
+		} catch (\Throwable $e) {
+			report($e);
+			session()->flash('flash_erro', $e->getMessage());
+
+			return redirect()->route('dfe.index');
 		}
 	}
 

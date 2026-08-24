@@ -189,8 +189,21 @@ class PagamentoPlanoController extends Controller
     public function notification(Request $request, $planoEmpresaId): JsonResponse
     {
         try {
-            $planoEmpresa = PlanoEmpresa::with('empresa')->findOrFail($planoEmpresaId);
             $metodo = (string) $request->input('metodo', '');
+            $planoEmpresa = PlanoEmpresa::with('empresa')->find($planoEmpresaId);
+
+            if (!$planoEmpresa) {
+                if ($metodo !== '') {
+                    return response()->json(['erro' => 'Plano da empresa não encontrado.'], 404);
+                }
+
+                Log::info('Webhook antigo do Mercado Pago ignorado: plano não existe mais.', [
+                    'plano_empresa_id' => $planoEmpresaId,
+                    'mp_payment_id' => data_get($request->all(), 'data.id'),
+                ]);
+
+                return response()->json(['received' => true, 'ignored' => true]);
+            }
 
             if ($metodo !== '') {
                 $this->validateSessionRequest($request, (int) $planoEmpresa->empresa_id);

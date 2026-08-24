@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -43,6 +44,14 @@ class Handler extends ExceptionHandler
      */
     public function register()
     {
+        $this->renderable(function (AccessDeniedHttpException $e, $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Empresa não identificada ou acesso não autorizado.',
+                ], 403);
+            }
+        });
+
         $this->reportable(function (Throwable $e) {
             //
         });

@@ -342,5 +342,5 @@
         enviarDevolucaoNaoFiscal(formId, administradorId, senha);
     });
 </script>
-<script type="text/javascript" src="/js/nfce.js?v=2"></script>
+<script type="text/javascript" src="{{ asset('js/nfce.js') }}?v={{ filemtime(public_path('js/nfce.js')) }}"></script>
 @endsection
