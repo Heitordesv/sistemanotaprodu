@@ -180,7 +180,27 @@ private function pesquisar(Request $request, bool $aceitarProdutoLegadoSemLocal)
         }
     }
 
-    return response()->json($temp, 200);
+    $resultado = $aceitarProdutoLegadoSemLocal
+        ? array_map(fn (Produto $produto) => $this->produtoParaPesquisaWeb($produto), $temp)
+        : $temp;
+
+    // Alguns cadastros antigos possuem caracteres fora de UTF-8. Um único
+    // texto inválido não pode inutilizar a pesquisa de produtos inteira.
+    return response()->json($resultado, 200, [], JSON_INVALID_UTF8_SUBSTITUTE);
+}
+
+private function produtoParaPesquisaWeb(Produto $produto): array
+{
+    return [
+        'id' => (int) $produto->id,
+        'nome' => (string) $produto->nome,
+        'str_grade' => (string) ($produto->str_grade ?? ''),
+        'valor_venda' => (float) $produto->valor_venda,
+        'estoqueAtual' => (float) ($produto->estoqueAtual ?? 0),
+        'estoque' => [
+            'quantidade' => (float) ($produto->estoqueAtual ?? 0),
+        ],
+    ];
 }
 
 private function normalizarFilialConsulta($filialId)
