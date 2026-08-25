@@ -201,7 +201,7 @@ class FiscalSecretsSecurityTest extends TestCase
     public function test_pdv_sobrescreve_validacao_legada_com_post_e_csrf(): void
     {
         $theme = (string) file_get_contents(public_path('js/theme.js'));
-        $layout = (string) file_get_contents(resource_path('views/frente_caixa/layout.blade.php'));
+        $layout = (string) file_get_contents(resource_path('views/frontBox/index.blade.php'));
 
         $this->assertStringContainsString("method: 'POST'", $theme);
         $this->assertStringContainsString("meta[name=\"csrf-token\"]", $theme);
