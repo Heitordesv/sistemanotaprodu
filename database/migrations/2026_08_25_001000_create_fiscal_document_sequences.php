@@ -82,6 +82,7 @@ return new class extends Migration
 
         DB::table('config_notas')
             ->select([
+                'id',
                 'empresa_id',
                 'ambiente',
                 'numero_serie_nfe',
