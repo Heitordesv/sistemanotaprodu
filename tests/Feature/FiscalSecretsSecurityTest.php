@@ -6,8 +6,10 @@ use App\Models\Certificado;
 use App\Models\ConfigNota;
 use App\Services\FiscalCertificateService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class FiscalSecretsSecurityTest extends TestCase
@@ -164,6 +166,75 @@ class FiscalSecretsSecurityTest extends TestCase
         $this->assertStringContainsString("storage_path('app/private/certificados/'", $source);
         $this->assertStringContainsString("->where('empresa_id', request()->empresa_id)", $source);
         $this->assertStringContainsString("\$request->csc !== '********'", $source);
+    }
+
+    public function test_get_de_verificacao_de_senha_esta_neutralizado_e_post_tem_throttle(): void
+    {
+        $routes = app('router')->getRoutes();
+
+        $getRoute = $routes->match(Request::create('/configNF/verificaSenha', 'GET'));
+        $getResponse = $getRoute->run();
+
+        $this->assertSame(405, $getResponse->getStatusCode());
+
+        $postRoute = $routes->match(Request::create('/configNF/verificaSenha', 'POST'));
+
+        $this->assertStringContainsString('ConfigNotaController@verificaSenha', $postRoute->getActionName());
+        $this->assertContains('throttle:10,1', $postRoute->gatherMiddleware());
+        $this->assertContains('web', $postRoute->gatherMiddleware());
+    }
+
+    public function test_download_de_chave_privada_do_contador_esta_bloqueado(): void
+    {
+        $route = app('router')->getRoutes()->match(
+            Request::create('/contador/download-certificado/10', 'GET')
+        );
+
+        try {
+            $route->run();
+            $this->fail('O endpoint legado não pode executar download de certificado.');
+        } catch (HttpException $e) {
+            $this->assertSame(403, $e->getStatusCode());
+        }
+    }
+
+    public function test_pdv_sobrescreve_validacao_legada_com_post_e_csrf(): void
+    {
+        $theme = (string) file_get_contents(public_path('js/theme.js'));
+        $layout = (string) file_get_contents(resource_path('views/frente_caixa/layout.blade.php'));
+
+        $this->assertStringContainsString("method: 'POST'", $theme);
+        $this->assertStringContainsString("meta[name=\"csrf-token\"]", $theme);
+        $this->assertStringContainsString("configNF/verificaSenha", $theme);
+        $this->assertStringContainsString("_token: csrfToken", $theme);
+
+        $frontBoxPosition = strpos($layout, "js/frontBox.js");
+        $themePosition = strpos($layout, "js/theme.js");
+
+        $this->assertNotFalse($frontBoxPosition);
+        $this->assertNotFalse($themePosition);
+        $this->assertLessThan($themePosition, $frontBoxPosition);
+    }
+
+    public function test_public_certificados_nao_contem_arquivos_de_chave_privada(): void
+    {
+        $directory = public_path('certificados');
+        $this->assertDirectoryExists($directory);
+
+        $proibidas = ['pfx', 'p12', 'bin', 'pem', 'key'];
+        $encontradas = [];
+
+        foreach ((array) scandir($directory) as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
+            if (in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), $proibidas, true)) {
+                $encontradas[] = $file;
+            }
+        }
+
+        $this->assertSame([], $encontradas, 'public/certificados não pode conter chave privada.');
     }
 
     private function removeTestPrivateDirectory(int $empresaId): void
