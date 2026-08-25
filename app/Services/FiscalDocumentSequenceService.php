@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\ConfigNota;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -41,14 +40,7 @@ class FiscalDocumentSequenceService
             $sourceType,
             $sourceId
         ) {
-            $existing = DB::table('fiscal_document_reservations')
-                ->where('empresa_id', $empresaId)
-                ->where('modelo', $modelo)
-                ->where('source_type', $sourceType)
-                ->where('source_id', $sourceId)
-                ->lockForUpdate()
-                ->first();
-
+            $existing = $this->findReservation($empresaId, $modelo, $sourceType, $sourceId, true);
             if ($existing) {
                 return $this->reservationToArray($existing);
             }
@@ -67,6 +59,14 @@ class FiscalDocumentSequenceService
                 throw new RuntimeException('Não foi possível inicializar a sequência fiscal.');
             }
 
+            // Uma segunda requisição do mesmo documento pode ter aguardado o lock
+            // da sequência enquanto a primeira persistia a reserva. Rechecamos já
+            // dentro da região serializada para não consumir um segundo número.
+            $existing = $this->findReservation($empresaId, $modelo, $sourceType, $sourceId, false);
+            if ($existing) {
+                return $this->reservationToArray($existing);
+            }
+
             $numero = (int) $sequence->ultimo_numero + 1;
             if ($numero > 999999999) {
                 throw new RuntimeException('A sequência fiscal atingiu o limite suportado.');
@@ -79,36 +79,18 @@ class FiscalDocumentSequenceService
                     'updated_at' => now(),
                 ]);
 
-            try {
-                $reservationId = DB::table('fiscal_document_reservations')->insertGetId([
-                    'empresa_id' => $empresaId,
-                    'modelo' => $modelo,
-                    'serie' => $serie,
-                    'ambiente' => $ambiente,
-                    'numero' => $numero,
-                    'source_type' => $sourceType,
-                    'source_id' => $sourceId,
-                    'status' => 'reserved',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            } catch (QueryException $e) {
-                // Uma segunda requisição do mesmo documento pode ter vencido a corrida
-                // entre o primeiro lookup e o INSERT. A unique key do source garante
-                // idempotência; em qualquer outro conflito propagamos o erro.
-                $winner = DB::table('fiscal_document_reservations')
-                    ->where('empresa_id', $empresaId)
-                    ->where('modelo', $modelo)
-                    ->where('source_type', $sourceType)
-                    ->where('source_id', $sourceId)
-                    ->first();
-
-                if (!$winner) {
-                    throw $e;
-                }
-
-                return $this->reservationToArray($winner);
-            }
+            $reservationId = DB::table('fiscal_document_reservations')->insertGetId([
+                'empresa_id' => $empresaId,
+                'modelo' => $modelo,
+                'serie' => $serie,
+                'ambiente' => $ambiente,
+                'numero' => $numero,
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'status' => 'reserved',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
             $this->syncLegacyCounter($empresaId, $modelo, $numero);
 
@@ -189,9 +171,6 @@ class FiscalDocumentSequenceService
             return;
         }
 
-        // Se este modelo ainda não possui nenhuma sequência nova, estamos no
-        // bootstrap do legado e preservamos o contador configurado atualmente.
-        // Se já existe outra série, a nova série nasce independente em 1.
         $hasModelSequence = DB::table('fiscal_document_sequences')
             ->where('empresa_id', $empresaId)
             ->where('modelo', $modelo)
@@ -239,6 +218,26 @@ class FiscalDocumentSequenceService
             $config->{$field} = $numero;
             $config->save();
         }
+    }
+
+    private function findReservation(
+        int $empresaId,
+        int $modelo,
+        string $sourceType,
+        int $sourceId,
+        bool $forUpdate
+    ): ?object {
+        $query = DB::table('fiscal_document_reservations')
+            ->where('empresa_id', $empresaId)
+            ->where('modelo', $modelo)
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId);
+
+        if ($forUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
     }
 
     private function validate(
