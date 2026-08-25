@@ -60,3 +60,75 @@ function avisoSonoro(som) {
 		})
 }
 
+// O frontBox.js legado validava a senha de autorização via GET, colocando o
+// segredo na query string. Como theme.js é carregado depois do frontBox.js no
+// PDV, substituímos somente esse boundary sem alterar as demais regras do caixa.
+(function securePdvPasswordValidation() {
+	if (typeof window.validaPass !== 'function') {
+		return;
+	}
+
+	window.validaPass = function (call) {
+		let senhaConfigurada = $('#pass').val();
+
+		if (senhaConfigurada === '' || window.SENHADESBLOQUEADA) {
+			call(true);
+			return;
+		}
+
+		swal({
+			title: 'Desconto de item',
+			text: 'Informe a senha!',
+			content: {
+				element: 'input',
+				attributes: {
+					type: 'password',
+					autocomplete: 'off'
+				}
+			},
+			buttons: ['Cancelar', 'Confirmar'],
+			dangerMode: true
+		}).then(function (senhaInformada) {
+			if (!senhaInformada) {
+				call(false);
+				return;
+			}
+
+			let csrfToken = $('meta[name="csrf-token"]').attr('content') || '';
+			let basePath = typeof path !== 'undefined'
+				? path
+				: (typeof path_url !== 'undefined' ? path_url : '/');
+
+			basePath = String(basePath || '/');
+			if (basePath.slice(-1) !== '/') {
+				basePath += '/';
+			}
+
+			$.ajax({
+				url: basePath + 'configNF/verificaSenha',
+				method: 'POST',
+				data: {
+					senha: senhaInformada,
+					_token: csrfToken
+				},
+				headers: csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}
+			})
+			.done(function () {
+				window.SENHADESBLOQUEADA = true;
+				call(true);
+			})
+			.fail(function (xhr) {
+				swal.close();
+
+				if (xhr && xhr.status === 429) {
+					swal('Atenção', 'Muitas tentativas de senha. Aguarde um momento e tente novamente.', 'warning')
+						.then(function () { call(false); });
+					return;
+				}
+
+				swal('Erro', 'Senha incorreta', 'error')
+					.then(function () { call(false); });
+			});
+		});
+	};
+})();
